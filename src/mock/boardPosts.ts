@@ -1,0 +1,78 @@
+import { BoardPost } from '../types';
+
+export const INITIAL_BOARD_POSTS: BoardPost[] = [
+  {
+    id: 'board-1',
+    title: 'Pilnie poszukuję kartonów do przeprowadzki',
+    content: 'Cześć sąsiedzi! W najbliższy weekend czeka mnie przeprowadzka. Jeśli komuś zalegają mocne kartony (po bananach lub ze sklepów), chętnie przyjadę i odbiorę. Mogę odwdzięczyć się domową szarlotką!',
+    tag: 'szukam',
+    authorName: 'Agnieszka W.',
+    locationArea: 'Warszawa, Mokotów',
+    createdAt: new Date(Date.now() - 40 * 60 * 1000).toISOString(), // 40 min temu
+    likesCount: 5,
+    contactInfo: 'Napisz na priv lub SMS: 501-XXX-XXX',
+  },
+  {
+    id: 'board-2',
+    title: 'Oddam ok. 40 czystych słoików po dżemach i miodzie',
+    content: 'Umyte, z nakrętkami, różne pojemności (od 250ml do 900ml). Szkoda wyrzucać do szkła, może ktoś robi zaprawy na zimę lub przetwory? Do odbioru w całości.',
+    tag: 'oddam',
+    authorName: 'Pan Stanisław',
+    locationArea: 'Warszawa, Ochota',
+    createdAt: new Date(Date.now() - 150 * 60 * 1000).toISOString(), // 2.5h temu
+    likesCount: 8,
+    contactInfo: 'Odbiór ul. Grójecka po 16:00',
+  },
+  {
+    id: 'board-3',
+    title: 'Duża wystawka palet drewnianych i desek na rogu!',
+    content: 'Szybki alert dla majsterkowiczów: przy remoncie kamienicy ekipa wystawiła kilkanaście europalet i suchych desek sosnowych. Idealne na meble ogrodowe lub do warsztatu.',
+    tag: 'info',
+    authorName: 'Michał (DIY)',
+    locationArea: 'Warszawa, Śródmieście Północne',
+    createdAt: new Date(Date.now() - 280 * 60 * 1000).toISOString(),
+    likesCount: 12,
+  },
+  {
+    id: 'board-4',
+    title: 'Chętnie pomogę w zniesieniu ciężkich rzeczy w sobotę',
+    content: 'Mam wolne przedpołudnie w tę sobotę i chętnie pomogę komuś starszemu lub potrzebującemu znieść szafę, lodówkę czy pralkę do wiaty/odbioru. W zamian wystarczy dobre słowo lub kawa.',
+    tag: 'pomoc',
+    authorName: 'Kamil R.',
+    locationArea: 'Warszawa, Wola',
+    createdAt: new Date(Date.now() - 720 * 60 * 1000).toISOString(),
+    likesCount: 21,
+    contactInfo: 'Piszcie śmiało na priv',
+  },
+  {
+    id: 'board-5',
+    title: 'Szukam starych gazet i czasopism do prac plastycznych',
+    content: 'Zbieram kolorowe magazyny, gazety codzienne i stare plakaty na warsztaty z kolażu dla dzieci w lokalnym domu kultury. Przyjmę każdą ilość!',
+    tag: 'szukam',
+    authorName: 'Paulina (Animatorka)',
+    locationArea: 'Warszawa, Żoliborz',
+    createdAt: new Date(Date.now() - 1440 * 60 * 1000).toISOString(), // 1 dzień temu
+    likesCount: 6,
+  },
+  {
+    id: 'board-lublin-1',
+    title: 'Wystawka drewnianych palet przy remoncie kamienicy',
+    content: 'Cześć Lublin! Na rogu Zielonej i Staszica stoi około 8 suchych europalet po dostawie tynków. Majster powiedział, że można brać za darmo przed deszczem.',
+    tag: 'info',
+    authorName: 'Rafał (Lublin Śródmieście)',
+    locationArea: 'Lublin, Śródmieście',
+    createdAt: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
+    likesCount: 9,
+  },
+  {
+    id: 'board-lublin-2',
+    title: 'Szukam wiertarki udarowej do pożyczenia na 1 godzinę',
+    content: 'Potrzebuję wywiercić 4 otwory pod karnisz w żelbecie w mieszkaniu przy Narutowicza. Zwrócę z dobrym piwem kraftowym lub czekoladą!',
+    tag: 'pomoc',
+    authorName: 'Tomek N.',
+    locationArea: 'Lublin, Centrum / Plac Wolności',
+    createdAt: new Date(Date.now() - 110 * 60 * 1000).toISOString(),
+    likesCount: 4,
+    contactInfo: 'Telefon lub SMS: 512-XXX-XXX',
+  },
+];

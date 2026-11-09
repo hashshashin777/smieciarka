@@ -1,25 +1,46 @@
 {
   "expo": {
-    "name": "smieciarka",
+    "name": "Śmieciarka",
     "slug": "smieciarka",
+    "scheme": "smieciarka",
+    "description": "Śmieciarka – wystawki i rzeczy do oddania za darmo. Ratuj skarby z ulicy i dziel się z sąsiadami.",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "fun.smieciarka.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Aplikacja Śmieciarka potrzebuje dostępu do aparatu, aby zrobić zdjęcie wystawki lub oddawanego przedmiotu.",
+        "NSPhotoLibraryUsageDescription": "Aplikacja Śmieciarka potrzebuje dostępu do galerii, aby dodać zdjęcie przedmiotu.",
+        "NSLocationWhenInUseUsageDescription": "Aplikacja Śmieciarka potrzebuje Twojej lokalizacji, aby pokazać wystawki w Twojej okolicy oraz oznaczyć lokalizację dodawanego przedmiotu."
+      }
     },
     "android": {
+      "package": "fun.smieciarka.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#10B981",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-font",
+      "expo-web-browser"
+    ]
   }
 }
