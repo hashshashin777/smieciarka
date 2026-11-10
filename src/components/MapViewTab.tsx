@@ -646,6 +646,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 7,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   emptyMapNotice: {
     position: 'absolute',

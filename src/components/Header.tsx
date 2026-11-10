@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Image, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Image, ScrollView, Linking } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { THEME, APP_FONT } from '../constants/categories';
 import { ItemType } from '../types';
@@ -31,7 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   return (
     <View style={[styles.container, isDark && styles.containerDark]}>
-      {/* 1. Reklama w zakładce Mapa (Własna grafika w zoptymalizowanym formacie WebP) */}
+      {/* 1. Reklama w zakładce Mapa (pozostaje nad search barem) */}
       {viewMode === 'map' && (
         <TouchableOpacity
           style={styles.adBannerCard}
@@ -96,6 +96,85 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </View>
       </View>
+
+      {/* 3. Reklama w zakładce Lista (przeniesiona POD search bar) */}
+      {viewMode === 'list' && (
+        <TouchableOpacity
+          style={[styles.adBannerCard, styles.listAdBannerCard]}
+          activeOpacity={0.9}
+          onPress={() => {
+            Alert.alert(
+              'sprawdzto24.pl 🧪',
+              'Testy użyteczności stron i sklepów internetowych z perspektywy klientów.\n\nCzy chcesz przejść do serwisu sprawdzto24.pl?',
+              [
+                { text: 'Otwórz sprawdzto24.pl', onPress: () => Linking.openURL('https://sprawdzto24.pl') },
+                { text: 'Zamknij', style: 'cancel' },
+              ]
+            );
+          }}
+        >
+          <Image
+            source={require('../assets/list_ad_banner.gif')}
+            style={styles.adBannerImage}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+      )}
+
+      {/* 4. Reklama w zakładce Tablica (przeniesiona POD search bar) */}
+      {viewMode === 'board' && (
+        <TouchableOpacity
+          style={[styles.adBannerCard, styles.boardAdBannerCard]}
+          activeOpacity={0.9}
+          onPress={() => {
+            Alert.alert(
+              'scraperek.online 🚀',
+              'Automatyczne wyszukiwanie firm i zbieranie kontaktów B2B (Google, Facebook, Instagram).\n\nCzy chcesz przejść do serwisu scraperek.online?',
+              [
+                { text: 'Otwórz scraperek.online', onPress: () => Linking.openURL('https://scraperek.online') },
+                { text: 'Zamknij', style: 'cancel' },
+              ]
+            );
+          }}
+        >
+          <Image
+            source={require('../assets/board_ad_banner.gif')}
+            style={styles.adBannerImage}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+      )}
+
+      {/* 5. Reklama w zakładce Zapisane (POD search bar) */}
+      {viewMode === 'saved' && (
+        <TouchableOpacity
+          style={[styles.adBannerCard, styles.savedAdBannerCard]}
+          activeOpacity={0.9}
+          onPress={() => {
+            Alert.alert(
+              'Wypożyczalnia Smaku 🍽️✨',
+              'Catering na Twoją okazję – Wesela, Komunie, Przyjęcia.\n\n📍 Lublin, ul. Jantarowa 5/u5\n📞 Tel: 733 473 721\n🌐 wypozyczalnia-smaku.pl',
+              [
+                {
+                  text: 'Zadzwoń',
+                  onPress: () => Linking.openURL('tel:733473721').catch(() => {}),
+                },
+                {
+                  text: 'Strona WWW',
+                  onPress: () => Linking.openURL('https://wypozyczalnia-smaku.pl').catch(() => {}),
+                },
+                { text: 'Zamknij', style: 'cancel' },
+              ]
+            );
+          }}
+        >
+          <Image
+            source={require('../assets/saved_ad_banner.gif')}
+            style={styles.adBannerImage}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+      )}
 
       {/* Filter Tabs w stylu zaokrąglonych pigułek jak na wzorcu */}
       {viewMode !== 'board' && viewMode !== 'saved' && (
@@ -221,6 +300,21 @@ const styles = StyleSheet.create({
     overflow: 'hidden', // Gwarantuje zachowanie zaokrąglonych brzegów
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  listAdBannerCard: {
+    aspectRatio: 1080 / 250,
+    backgroundColor: '#172a29',
+    borderColor: '#2d4742',
+  },
+  boardAdBannerCard: {
+    aspectRatio: 1080 / 250,
+    backgroundColor: '#14233c',
+    borderColor: '#d7e2f3',
+  },
+  savedAdBannerCard: {
+    aspectRatio: 1080 / 390,
+    backgroundColor: '#241c1a',
+    borderColor: '#3D2B24',
   },
   adBannerImage: {
     width: '100%',

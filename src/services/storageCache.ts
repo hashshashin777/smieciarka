@@ -7,6 +7,7 @@ const STORAGE_KEYS = {
   NEIGHBORHOOD: 'smieciarka_neighborhood_settings_v1',
   ECO_STATS: 'smieciarka_eco_stats_v1',
   STREAK: 'smieciarka_streak_v1',
+  TUTORIAL_COMPLETED: 'smieciarka_tutorial_completed_v1',
 };
 
 export interface NeighborhoodSettings {
@@ -167,6 +168,23 @@ export const StorageCache = {
       }
     } catch {
       return 3;
+    }
+  },
+
+  async isTutorialCompleted(): Promise<boolean> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.TUTORIAL_COMPLETED);
+      return data === 'true';
+    } catch {
+      return false;
+    }
+  },
+
+  async setTutorialCompleted(completed: boolean = true): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.TUTORIAL_COMPLETED, completed ? 'true' : 'false');
+    } catch {
+      // Ignore
     }
   },
 };

@@ -13,6 +13,7 @@ import {
   Platform,
   LayoutAnimation,
   UIManager,
+  Linking,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -39,6 +40,8 @@ import { ItemChatModal } from './src/components/ItemChatModal';
 import { calculateDistance } from './src/utils/helpers';
 import { UserProfile, AuthProvider } from './src/types';
 import { AuthService } from './src/services/authService';
+import { TutorialTooltip } from './src/components/TutorialTooltip';
+import { TUTORIAL_STEPS } from './src/constants/tutorialSteps';
 import {
   StorageCache,
   EcoStats,
@@ -120,6 +123,7 @@ export default function App() {
   const [themeMode, setThemeMode] = useState<'light'>('light');
   const [isAddTooltipVisible, setIsAddTooltipVisible] = useState(true);
   const [isBoardTooltipDismissed, setIsBoardTooltipDismissed] = useState(false);
+  const [tutorialStepIndex, setTutorialStepIndex] = useState<number | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
 
   // Zaawansowane filtry i sortowanie (Moduł E)
@@ -207,6 +211,10 @@ export default function App() {
         const profile = await AuthService.getUserProfile();
         if (profile) {
           setCurrentUser(profile);
+        }
+        const tutorialDone = await StorageCache.isTutorialCompleted();
+        if (!tutorialDone) {
+          setTutorialStepIndex(0);
         }
       } catch (cacheErr) {
         // Pomijamy błąd cache
@@ -479,6 +487,32 @@ export default function App() {
     }
   };
 
+  // Obsługa samouczka krok po kroku
+  const handleNextTutorialStep = async () => {
+    if (tutorialStepIndex === null) return;
+    const nextIdx = tutorialStepIndex + 1;
+    if (nextIdx >= TUTORIAL_STEPS.length) {
+      setTutorialStepIndex(null);
+      await StorageCache.setTutorialCompleted(true);
+    } else {
+      if (nextIdx <= 3 && viewMode !== 'home') {
+        setViewMode('home');
+      }
+      setTutorialStepIndex(nextIdx);
+    }
+  };
+
+  const handleDismissTutorial = async () => {
+    setTutorialStepIndex(null);
+    await StorageCache.setTutorialCompleted(true);
+  };
+
+  const handleRestartTutorial = async () => {
+    setViewMode('home');
+    setTutorialStepIndex(0);
+    await StorageCache.setTutorialCompleted(false);
+  };
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
@@ -561,6 +595,10 @@ export default function App() {
               onOpenLogin={() => setIsLoginModalVisible(true)}
               onSignOut={handleSignOut}
               isDark={false}
+              tutorialStepIndex={tutorialStepIndex}
+              onNextTutorialStep={handleNextTutorialStep}
+              onDismissTutorial={handleDismissTutorial}
+              onRestartTutorial={handleRestartTutorial}
             />
           ) : viewMode === 'map' ? (
             <MapViewTab
@@ -591,26 +629,12 @@ export default function App() {
               data={sortedItems}
               keyExtractor={(item) => item.id}
               ListHeaderComponent={
-                <View>
-                  <TouchableOpacity
-                    style={styles.listAdBannerCard}
-                    activeOpacity={0.9}
-                    onPress={() => setIsAddModalVisible(true)}
+                <View style={styles.listFiltersContainer}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.filterPillsScroll}
                   >
-                    <Image
-                      source={require('./src/assets/list_ad_banner.webp')}
-                      style={styles.adBannerImage}
-                      resizeMode="contain"
-                    />
-                  </TouchableOpacity>
-
-                  {/* Pasek zaawansowanych filtrów i sortowania (Moduł E) */}
-                  <View style={styles.listFiltersContainer}>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.filterPillsScroll}
-                    >
                       {/* Sortowanie: Najbliżej */}
                       <TouchableOpacity
                         style={[styles.filterPill, sortMode === 'nearest' && styles.filterPillActive]}
@@ -683,7 +707,6 @@ export default function App() {
                       ))}
                     </ScrollView>
                   </View>
-                </View>
               }
               renderItem={({ item }) => (
                 <ItemCard
@@ -756,35 +779,50 @@ export default function App() {
 
         {/* Dolny panel: Wyeksponowany Hero Button Dodawania ZNALEZISKA + 5 Zakładek */}
         <View style={styles.bottomNavWrapper} pointerEvents="box-none">
-          {/* Chmurka informacyjna nad przyciskiem z możliwością zamknięcia */}
-          {((viewMode !== 'board' && isAddTooltipVisible) || (viewMode === 'board' && !isBoardTooltipDismissed)) && (
+          {/* SAMOUCZEK - Krok 1 (Aparat): Zastępuje dawną statyczną chmurkę */}
+          {tutorialStepIndex === 0 && (
+            <View style={styles.tutorialStep0Container} pointerEvents="box-none">
+              <TutorialTooltip
+                {...TUTORIAL_STEPS[0]}
+                onNext={handleNextTutorialStep}
+                onDismiss={handleDismissTutorial}
+              />
+            </View>
+          )}
+
+          {/* SAMOUCZEK - Krok 5 (Tablica ogłoszeń): Wskazuje zakładkę Tablica */}
+          {tutorialStepIndex === 4 && (
+            <View style={styles.tutorialStep4Container} pointerEvents="box-none">
+              <TutorialTooltip
+                {...TUTORIAL_STEPS[4]}
+                isLastStep={true}
+                onNext={handleNextTutorialStep}
+                onDismiss={handleDismissTutorial}
+              />
+            </View>
+          )}
+
+          {/* Domyślna chmurka tablicy, gdy samouczek jest nieaktywny */}
+          {tutorialStepIndex === null && viewMode === 'board' && !isBoardTooltipDismissed && (
             <View style={styles.tooltipBubbleContainer} pointerEvents="box-none">
               <View
                 style={[
                   styles.tooltipBubble,
-                  viewMode === 'board' ? styles.tooltipBubbleBoard : styles.tooltipBubbleGeneral,
+                  styles.tooltipBubbleBoard,
                 ]}
               >
                 <MaterialCommunityIcons
-                  name={viewMode === 'board' ? 'comment-text-outline' : 'map-marker-radius'}
+                  name="comment-text-outline"
                   size={15}
-                  color={viewMode === 'board' ? '#38BDF8' : '#10B981'}
+                  color="#38BDF8"
                   style={{ marginRight: 6 }}
                 />
                 <Text style={styles.tooltipText}>
-                  {viewMode === 'board'
-                    ? 'Dodawaj ogłoszenia sąsiedzkie i pytaj o pomoc'
-                    : 'Dodawaj znaleziska wprost z miejsca w którym stoisz'}
+                  Dodawaj ogłoszenia sąsiedzkie i pytaj o pomoc
                 </Text>
                 <TouchableOpacity
                   style={styles.tooltipCloseBtn}
-                  onPress={() => {
-                    if (viewMode === 'board') {
-                      setIsBoardTooltipDismissed(true);
-                    } else {
-                      setIsAddTooltipVisible(false);
-                    }
-                  }}
+                  onPress={() => setIsBoardTooltipDismissed(true)}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   activeOpacity={0.7}
                 >
@@ -795,7 +833,7 @@ export default function App() {
               <View
                 style={[
                   styles.tooltipArrow,
-                  viewMode === 'board' ? styles.tooltipArrowBoard : styles.tooltipArrowGeneral,
+                  styles.tooltipArrowBoard,
                 ]}
               />
             </View>
@@ -803,7 +841,10 @@ export default function App() {
 
           {/* Wyeksponowany Przycisk ze szmaragdowym gradientem i powiększoną ikoną */}
           <TouchableOpacity
-            style={styles.heroAddButtonWrapper}
+            style={[
+              styles.heroAddButtonWrapper,
+              tutorialStepIndex === 0 && styles.heroAddButtonHighlighted,
+            ]}
             onPress={() => {
               if (viewMode === 'board') {
                 setIsAddBoardModalVisible(true);
@@ -836,7 +877,10 @@ export default function App() {
                 return (
                   <TouchableOpacity
                     key={tab.id}
-                    style={styles.navTabPill}
+                    style={[
+                      styles.navTabPill,
+                      tab.id === 'board' && tutorialStepIndex === 4 && styles.highlightedBoardTab,
+                    ]}
                     onPress={() => {
                       if (viewMode !== tab.id) {
                         try {
@@ -873,7 +917,10 @@ export default function App() {
               return (
                 <TouchableOpacity
                   key={tab.id}
-                  style={styles.navTabCircle}
+                  style={[
+                    styles.navTabCircle,
+                    tab.id === 'board' && tutorialStepIndex === 4 && styles.highlightedBoardTab,
+                  ]}
                   onPress={() => {
                     if (viewMode !== tab.id) {
                       try {
@@ -1034,25 +1081,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#0B0F19',
   },
   listContent: {
-    paddingTop: 14,
+    paddingTop: 10,
     paddingBottom: 110, // Zoptymalizowana przestrzeń pod nowoczesny dolny pasek nawigacyjny
-  },
-  listAdBannerCard: {
-    height: 86,
-    backgroundColor: '#F9D904',
-    borderRadius: 18,
-    marginHorizontal: 16,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#EAB308',
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   listFiltersContainer: {
     marginBottom: 12,
@@ -1282,6 +1312,32 @@ const styles = StyleSheet.create({
   },
   tooltipArrowBoard: {
     borderTopColor: '#0284C7',
+  },
+  tutorialStep0Container: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 4,
+    zIndex: 100,
+  },
+  tutorialStep4Container: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 4,
+    zIndex: 100,
+  },
+  heroAddButtonHighlighted: {
+    transform: [{ scale: 1.08 }],
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.8,
+    shadowRadius: 16,
+    elevation: 14,
+  },
+  highlightedBoardTab: {
+    borderWidth: 2,
+    borderColor: '#38BDF8',
+    borderRadius: 24,
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
   },
   heroAddButtonWrapper: {
     marginBottom: 8,

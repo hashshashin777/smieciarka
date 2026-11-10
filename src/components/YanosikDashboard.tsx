@@ -16,6 +16,8 @@ import { PostItem, ItemType, UserProfile } from '../types';
 import { THEME, GRADIENTS, APP_FONT } from '../constants/categories';
 import { EcoImpactCard } from './EcoImpactCard';
 import { EcoStats, NeighborhoodSettings } from '../services/storageCache';
+import { TutorialTooltip } from './TutorialTooltip';
+import { TUTORIAL_STEPS } from '../constants/tutorialSteps';
 
 interface YanosikDashboardProps {
   searchQuery: string;
@@ -40,6 +42,10 @@ interface YanosikDashboardProps {
   onOpenLogin?: () => void;
   onSignOut?: () => void;
   isDark?: boolean;
+  tutorialStepIndex?: number | null;
+  onNextTutorialStep?: () => void;
+  onDismissTutorial?: () => void;
+  onRestartTutorial?: () => void;
 }
 
 export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
@@ -65,9 +71,25 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
   onOpenLogin,
   onSignOut,
   isDark: _isDark = false,
+  tutorialStepIndex = null,
+  onNextTutorialStep,
+  onDismissTutorial,
+  onRestartTutorial,
 }) => {
   // Pulpit jest zawsze w jasnym motywie (Light Mode)
   const isDark = false;
+  const scrollRef = React.useRef<React.ElementRef<typeof ScrollView>>(null);
+
+  // Samoczynne przewijanie do wskazanego elementu w samouczku
+  React.useEffect(() => {
+    if (tutorialStepIndex === 1) {
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    } else if (tutorialStepIndex === 2) {
+      scrollRef.current?.scrollTo({ y: 130, animated: true });
+    } else if (tutorialStepIndex === 3) {
+      scrollRef.current?.scrollTo({ y: 260, animated: true });
+    }
+  }, [tutorialStepIndex]);
 
   // Filtrowanie ogłoszeń na pulpicie (jeśli użytkownik wpisał frazę w wyszukiwarkę)
   const displayedItems = searchQuery.trim().length > 0
@@ -80,6 +102,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
   return (
     <View style={styles.container}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -134,6 +157,16 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                 </Text>
                 <Text style={styles.authStatusSub}>Konto aktywne • Wiadomości włączone</Text>
               </View>
+              {onRestartTutorial && (
+                <TouchableOpacity
+                  style={styles.tutorialLauncherBtn}
+                  onPress={onRestartTutorial}
+                  activeOpacity={0.8}
+                >
+                  <MaterialCommunityIcons name="school-outline" size={13} color="#059669" />
+                  <Text style={styles.tutorialLauncherText}>Samouczek</Text>
+                </TouchableOpacity>
+              )}
               {onSignOut && (
                 <TouchableOpacity
                   style={styles.signOutBtn}
@@ -159,6 +192,16 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                 </Text>
                 <Text style={styles.guestStatusSub}>Zaloguj przez Apple/Google, aby pisać wiadomości</Text>
               </View>
+              {onRestartTutorial && (
+                <TouchableOpacity
+                  style={styles.tutorialLauncherBtn}
+                  onPress={onRestartTutorial}
+                  activeOpacity={0.8}
+                >
+                  <MaterialCommunityIcons name="school-outline" size={13} color="#059669" />
+                  <Text style={styles.tutorialLauncherText}>Samouczek</Text>
+                </TouchableOpacity>
+              )}
               <LinearGradient
                 colors={['#10B981', '#059669']}
                 start={{ x: 0, y: 0 }}
@@ -191,7 +234,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
         </TouchableOpacity>
 
         {/* 1. DUŻY SEARCH BAR ("Czego szukasz w okolicy?") */}
-        <View style={styles.searchBarCard}>
+        <View style={[styles.searchBarCard, tutorialStepIndex === 1 && styles.highlightedCard]}>
           <MaterialCommunityIcons name="magnify" size={26} color="#475569" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
@@ -212,76 +255,104 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
           )}
         </View>
 
+        {/* Chmurka samouczka - Krok 2 (Wyszukiwarka) */}
+        {tutorialStepIndex === 1 && (
+          <View style={styles.tutorialTooltipWrapper}>
+            <TutorialTooltip
+              {...TUTORIAL_STEPS[1]}
+              onNext={() => onNextTutorialStep?.()}
+              onDismiss={() => onDismissTutorial?.()}
+            />
+          </View>
+        )}
+
         {/* 2. PASEK MÓJ REWIR (Geofencing & Alerty sąsiedzkie ze zintegrowanym suwakiem) */}
         {onOpenNeighborhoodModal && (
-          <LinearGradient
-            colors={isDark ? ['#132E2F', '#0B1B1C'] : ['#FFFFFF', '#EEFAF5']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.rewirCard, isDark && styles.rewirCardDark]}
-          >
-            {/* Górny wiersz paska: Tytuł, zasięg i przycisk alertów */}
-            <View style={styles.rewirTopRow}>
-              <View style={styles.rewirLeft}>
-                <View style={styles.rewirIconBox}>
-                  <MaterialCommunityIcons name="map-marker-radius" size={20} color="#10B981" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={[styles.rewirTitle, isDark && styles.textWhite]}>
-                      Mój rewir: <Text style={{ color: '#059669', fontWeight: '900' }}>{neighborhoodSettings.radiusKm >= 20 ? 'Całe miasto' : `${neighborhoodSettings.radiusKm} km`}</Text>
+          <View style={tutorialStepIndex === 2 && styles.highlightedCardWrapper}>
+            <LinearGradient
+              colors={isDark ? ['#132E2F', '#0B1B1C'] : ['#FFFFFF', '#EEFAF5']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[
+                styles.rewirCard,
+                isDark && styles.rewirCardDark,
+                tutorialStepIndex === 2 && styles.highlightedCard,
+              ]}
+            >
+              {/* Górny wiersz paska: Tytuł, zasięg i przycisk alertów */}
+              <View style={styles.rewirTopRow}>
+                <View style={styles.rewirLeft}>
+                  <View style={styles.rewirIconBox}>
+                    <MaterialCommunityIcons name="map-marker-radius" size={20} color="#10B981" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.rewirTitle, isDark && styles.textWhite]}>
+                        Mój rewir: <Text style={{ color: '#059669', fontWeight: '900' }}>{neighborhoodSettings.radiusKm >= 20 ? 'Całe miasto' : `${neighborhoodSettings.radiusKm} km`}</Text>
+                      </Text>
+                    </View>
+                    <Text style={styles.rewirSub}>
+                      {neighborhoodSettings.radiusKm <= 1
+                        ? 'Krótki spacer (10 min)'
+                        : neighborhoodSettings.radiusKm <= 3
+                        ? 'Rower / szybki dojazd (5-10 min)'
+                        : neighborhoodSettings.radiusKm <= 7
+                        ? 'Twoja dzielnica'
+                        : 'Szeroka okolica miasta'}
                     </Text>
                   </View>
-                  <Text style={styles.rewirSub}>
-                    {neighborhoodSettings.radiusKm <= 1
-                      ? 'Krótki spacer (10 min)'
-                      : neighborhoodSettings.radiusKm <= 3
-                      ? 'Rower / szybki dojazd (5-10 min)'
-                      : neighborhoodSettings.radiusKm <= 7
-                      ? 'Twoja dzielnica'
-                      : 'Szeroka okolica miasta'}
+                </View>
+
+                <TouchableOpacity 
+                  style={[styles.rewirAlertBadge, neighborhoodSettings.alertsEnabled ? styles.rewirAlertOn : styles.rewirAlertOff]}
+                  onPress={onOpenNeighborhoodModal}
+                  activeOpacity={0.8}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <MaterialCommunityIcons 
+                    name={neighborhoodSettings.alertsEnabled ? 'bell-ring' : 'bell-off'} 
+                    size={14} 
+                    color={neighborhoodSettings.alertsEnabled ? '#047857' : '#94A3B8'} 
+                  />
+                  <Text style={[styles.rewirAlertText, neighborhoodSettings.alertsEnabled ? styles.rewirAlertTextOn : styles.rewirAlertTextOff]}>
+                    {neighborhoodSettings.alertsEnabled ? 'Alerty WŁ.' : 'WYŁ.'}
                   </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Suwak regulacji zasięgu */}
+              <View style={styles.sliderSection}>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={1}
+                  maximumValue={20}
+                  step={1}
+                  value={neighborhoodSettings.radiusKm}
+                  onValueChange={(val) => onChangeRadius?.(val)}
+                  minimumTrackTintColor="#10B981"
+                  maximumTrackTintColor={isDark ? '#334155' : '#E2E8F0'}
+                  thumbTintColor="#059669"
+                />
+                <View style={styles.sliderLabelsRow}>
+                  <Text style={styles.sliderLabelMin}>1 km</Text>
+                  <Text style={styles.sliderLabelMid}>5 km</Text>
+                  <Text style={styles.sliderLabelMid}>10 km</Text>
+                  <Text style={styles.sliderLabelMax}>20 km</Text>
                 </View>
               </View>
+            </LinearGradient>
 
-              <TouchableOpacity 
-                style={[styles.rewirAlertBadge, neighborhoodSettings.alertsEnabled ? styles.rewirAlertOn : styles.rewirAlertOff]}
-                onPress={onOpenNeighborhoodModal}
-                activeOpacity={0.8}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <MaterialCommunityIcons 
-                  name={neighborhoodSettings.alertsEnabled ? 'bell-ring' : 'bell-off'} 
-                  size={14} 
-                  color={neighborhoodSettings.alertsEnabled ? '#047857' : '#94A3B8'} 
+            {/* Chmurka samouczka - Krok 3 (Mój rewir) */}
+            {tutorialStepIndex === 2 && (
+              <View style={styles.tutorialTooltipWrapper}>
+                <TutorialTooltip
+                  {...TUTORIAL_STEPS[2]}
+                  onNext={() => onNextTutorialStep?.()}
+                  onDismiss={() => onDismissTutorial?.()}
                 />
-                <Text style={[styles.rewirAlertText, neighborhoodSettings.alertsEnabled ? styles.rewirAlertTextOn : styles.rewirAlertTextOff]}>
-                  {neighborhoodSettings.alertsEnabled ? 'Alerty WŁ.' : 'WYŁ.'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Suwak regulacji zasięgu */}
-            <View style={styles.sliderSection}>
-              <Slider
-                style={styles.slider}
-                minimumValue={1}
-                maximumValue={20}
-                step={1}
-                value={neighborhoodSettings.radiusKm}
-                onValueChange={(val) => onChangeRadius?.(val)}
-                minimumTrackTintColor="#10B981"
-                maximumTrackTintColor={isDark ? '#334155' : '#E2E8F0'}
-                thumbTintColor="#059669"
-              />
-              <View style={styles.sliderLabelsRow}>
-                <Text style={styles.sliderLabelMin}>1 km</Text>
-                <Text style={styles.sliderLabelMid}>5 km</Text>
-                <Text style={styles.sliderLabelMid}>10 km</Text>
-                <Text style={styles.sliderLabelMax}>20 km</Text>
               </View>
-            </View>
-          </LinearGradient>
+            )}
+          </View>
         )}
 
         {/* 3. 4 KAFELKI SKRÓTÓW (Wystawki / Oddam / Tablica / Zapisane z gradientem) */}
@@ -393,7 +464,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
 
           {/* Prawy kafelek: Mapa (Zieleń i delikatny gradient jak button aparatu) */}
           <TouchableOpacity
-            style={styles.splitCardWrapper}
+            style={[styles.splitCardWrapper, tutorialStepIndex === 3 && styles.highlightedSplitCard]}
             onPress={onOpenMap}
             activeOpacity={0.85}
           >
@@ -411,6 +482,17 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
             </LinearGradient>
           </TouchableOpacity>
         </View>
+
+        {/* Chmurka samouczka - Krok 4 (Mapa) */}
+        {tutorialStepIndex === 3 && (
+          <View style={styles.tutorialTooltipWrapper}>
+            <TutorialTooltip
+              {...TUTORIAL_STEPS[3]}
+              onNext={() => onNextTutorialStep?.()}
+              onDismiss={() => onDismissTutorial?.()}
+            />
+          </View>
+        )}
 
         {/* 5. TWÓJ WPŁYW ZERO-WASTE */}
         <EcoImpactCard stats={ecoStats} streakDays={streakDays} isDark={isDark} />
@@ -604,10 +686,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // Baner reklamowy (Własna grafika z zaokrąglonymi brzegami)
+  // Baner reklamowy (Własna grafika z zaokrąglonymi brzegami przeskalowana do 1080x341)
   adBannerCard: {
     width: '100%',
-    aspectRatio: 1024 / 341,
+    aspectRatio: 1080 / 341,
     backgroundColor: '#02242E',
     borderRadius: 18,
     marginBottom: 16,
@@ -1020,8 +1102,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 6,
-    borderWidth: 1.5,
-    borderColor: '#10B981',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   floatingBadgeCount: {
     fontFamily: APP_FONT,
@@ -1029,5 +1111,50 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     marginTop: 2,
+  },
+
+  // Style samouczka (Kroki 2, 3, 4 oraz przycisk restartu)
+  tutorialTooltipWrapper: {
+    marginTop: 6,
+    marginBottom: 8,
+    zIndex: 100,
+  },
+  highlightedCardWrapper: {
+    marginBottom: 12,
+  },
+  highlightedCard: {
+    borderWidth: 2,
+    borderColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  highlightedSplitCard: {
+    transform: [{ scale: 1.02 }],
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  tutorialLauncherBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    borderRadius: 20,
+    marginRight: 6,
+  },
+  tutorialLauncherText: {
+    fontFamily: APP_FONT,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#065F46',
   },
 });

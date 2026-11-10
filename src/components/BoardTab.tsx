@@ -110,35 +110,6 @@ export const BoardTab: React.FC<BoardTabProps> = ({
       <FlatList
         data={filteredPosts}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={
-          <TouchableOpacity
-            style={styles.adBannerCard}
-            activeOpacity={0.9}
-            onPress={() =>
-              Alert.alert(
-                'Wypożyczalnia Smaku 🍽️',
-                'Catering na Twoją okazję – Wesela, Komunie, Przyjęcia.\n\n📍 Lublin, ul. Jantarowa 5/u5\n📞 Tel: 733 473 721\n🌐 wypozyczalnia-smaku.pl',
-                [
-                  {
-                    text: 'Zadzwoń',
-                    onPress: () => Linking.openURL('tel:733473721').catch(() => {}),
-                  },
-                  {
-                    text: 'Strona WWW',
-                    onPress: () => Linking.openURL('https://wypozyczalnia-smaku.pl').catch(() => {}),
-                  },
-                  { text: 'Zamknij', style: 'cancel' },
-                ]
-              )
-            }
-          >
-            <Image
-              source={require('../assets/board_ad_banner.webp')}
-              style={styles.adBannerImage}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-        }
         renderItem={({ item }) => (
           <BoardCard
             post={item}
@@ -209,29 +180,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   listContent: {
-    paddingTop: 14,
+    paddingTop: 10,
     paddingBottom: 110, // Przestrzeń pod zintegrowany dolny pasek nawigacyjny
-  },
-  adBannerCard: {
-    height: 86,
-    backgroundColor: '#231815',
-    borderRadius: 18,
-    marginHorizontal: 16,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#3D2B24',
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  adBannerImage: {
-    width: '100%',
-    height: '100%',
   },
   emptyContainer: {
     alignItems: 'center',
