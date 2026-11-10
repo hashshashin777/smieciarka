@@ -1,0 +1,51 @@
+name: Build iOS IPA for Sideloadly
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master, main ]
+
+jobs:
+  build-ipa:
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuild iOS native project
+        run: npx expo prebuild --platform ios
+
+      - name: Build Archive (Unsigned)
+        run: |
+          xcodebuild archive \
+            -workspace ios/smieciarka.xcworkspace \
+            -scheme smieciarka \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/smieciarka.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
+
+      - name: Create IPA Package
+        run: |
+          mkdir -p Payload
+          cp -r build/smieciarka.xcarchive/Products/Applications/*.app Payload/
+          zip -r -y smieciarka.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: smieciarka-ios-ipa
+          path: smieciarka.ipa
+          retention-days: 7
