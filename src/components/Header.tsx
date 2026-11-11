@@ -31,7 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   return (
     <View style={[styles.container, isDark && styles.containerDark]}>
-      {/* 1. Reklama w zakładce Mapa (pozostaje nad search barem) */}
+      {/* 1. Reklamy na samej górze (nad search barem) w zakładkach Mapa, Lista, Tablica i Zapisane */}
       {viewMode === 'map' && (
         <TouchableOpacity
           style={styles.adBannerCard}
@@ -52,8 +52,84 @@ export const Header: React.FC<HeaderProps> = ({
         </TouchableOpacity>
       )}
 
+      {viewMode === 'list' && (
+        <TouchableOpacity
+          style={[styles.adBannerCard, styles.listAdBannerCard]}
+          activeOpacity={0.9}
+          onPress={() => {
+            Alert.alert(
+              'sprawdzto24.pl 🧪',
+              'Testy użyteczności stron i sklepów internetowych z perspektywy klientów.\n\nCzy chcesz przejść do serwisu sprawdzto24.pl?',
+              [
+                { text: 'Otwórz sprawdzto24.pl', onPress: () => Linking.openURL('https://sprawdzto24.pl') },
+                { text: 'Zamknij', style: 'cancel' },
+              ]
+            );
+          }}
+        >
+          <Image
+            source={require('../assets/list_ad_banner.gif')}
+            style={styles.adBannerImage}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+      )}
+
+      {viewMode === 'board' && (
+        <TouchableOpacity
+          style={[styles.adBannerCard, styles.boardAdBannerCard]}
+          activeOpacity={0.9}
+          onPress={() => {
+            Alert.alert(
+              'scraperek.online 🚀',
+              'Automatyczne wyszukiwanie firm i zbieranie kontaktów B2B (Google, Facebook, Instagram).\n\nCzy chcesz przejść do serwisu scraperek.online?',
+              [
+                { text: 'Otwórz scraperek.online', onPress: () => Linking.openURL('https://scraperek.online') },
+                { text: 'Zamknij', style: 'cancel' },
+              ]
+            );
+          }}
+        >
+          <Image
+            source={require('../assets/board_ad_banner.gif')}
+            style={styles.adBannerImage}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+      )}
+
+      {viewMode === 'saved' && (
+        <TouchableOpacity
+          style={[styles.adBannerCard, styles.savedAdBannerCard]}
+          activeOpacity={0.9}
+          onPress={() => {
+            Alert.alert(
+              'Wypożyczalnia Smaku 🍽️✨',
+              'Catering na Twoją okazję – Wesela, Komunie, Przyjęcia.\n\n📍 Lublin, ul. Jantarowa 5/u5\n📞 Tel: 733 473 721\n🌐 wypozyczalnia-smaku.pl',
+              [
+                {
+                  text: 'Zadzwoń',
+                  onPress: () => Linking.openURL('tel:733473721').catch(() => {}),
+                },
+                {
+                  text: 'Strona WWW',
+                  onPress: () => Linking.openURL('https://wypozyczalnia-smaku.pl').catch(() => {}),
+                },
+                { text: 'Zamknij', style: 'cancel' },
+              ]
+            );
+          }}
+        >
+          <Image
+            source={require('../assets/saved_ad_banner.gif')}
+            style={styles.adBannerImage}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+      )}
+
       {/* 2. Wiersz z przyciskiem wstecz po lewej stronie i search barem (identycznym jak na pulpicie) */}
-      <View style={styles.searchRow}>
+      <View style={[styles.searchRow, (viewMode === 'board' || viewMode === 'saved') && styles.searchRowCompact]}>
         {onGoBackToHome && (
           <TouchableOpacity
             onPress={onGoBackToHome}
@@ -96,85 +172,6 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </View>
       </View>
-
-      {/* 3. Reklama w zakładce Lista (przeniesiona POD search bar) */}
-      {viewMode === 'list' && (
-        <TouchableOpacity
-          style={[styles.adBannerCard, styles.listAdBannerCard]}
-          activeOpacity={0.9}
-          onPress={() => {
-            Alert.alert(
-              'sprawdzto24.pl 🧪',
-              'Testy użyteczności stron i sklepów internetowych z perspektywy klientów.\n\nCzy chcesz przejść do serwisu sprawdzto24.pl?',
-              [
-                { text: 'Otwórz sprawdzto24.pl', onPress: () => Linking.openURL('https://sprawdzto24.pl') },
-                { text: 'Zamknij', style: 'cancel' },
-              ]
-            );
-          }}
-        >
-          <Image
-            source={require('../assets/list_ad_banner.gif')}
-            style={styles.adBannerImage}
-            resizeMode="cover"
-          />
-        </TouchableOpacity>
-      )}
-
-      {/* 4. Reklama w zakładce Tablica (przeniesiona POD search bar) */}
-      {viewMode === 'board' && (
-        <TouchableOpacity
-          style={[styles.adBannerCard, styles.boardAdBannerCard]}
-          activeOpacity={0.9}
-          onPress={() => {
-            Alert.alert(
-              'scraperek.online 🚀',
-              'Automatyczne wyszukiwanie firm i zbieranie kontaktów B2B (Google, Facebook, Instagram).\n\nCzy chcesz przejść do serwisu scraperek.online?',
-              [
-                { text: 'Otwórz scraperek.online', onPress: () => Linking.openURL('https://scraperek.online') },
-                { text: 'Zamknij', style: 'cancel' },
-              ]
-            );
-          }}
-        >
-          <Image
-            source={require('../assets/board_ad_banner.gif')}
-            style={styles.adBannerImage}
-            resizeMode="cover"
-          />
-        </TouchableOpacity>
-      )}
-
-      {/* 5. Reklama w zakładce Zapisane (POD search bar) */}
-      {viewMode === 'saved' && (
-        <TouchableOpacity
-          style={[styles.adBannerCard, styles.savedAdBannerCard]}
-          activeOpacity={0.9}
-          onPress={() => {
-            Alert.alert(
-              'Wypożyczalnia Smaku 🍽️✨',
-              'Catering na Twoją okazję – Wesela, Komunie, Przyjęcia.\n\n📍 Lublin, ul. Jantarowa 5/u5\n📞 Tel: 733 473 721\n🌐 wypozyczalnia-smaku.pl',
-              [
-                {
-                  text: 'Zadzwoń',
-                  onPress: () => Linking.openURL('tel:733473721').catch(() => {}),
-                },
-                {
-                  text: 'Strona WWW',
-                  onPress: () => Linking.openURL('https://wypozyczalnia-smaku.pl').catch(() => {}),
-                },
-                { text: 'Zamknij', style: 'cancel' },
-              ]
-            );
-          }}
-        >
-          <Image
-            source={require('../assets/saved_ad_banner.gif')}
-            style={styles.adBannerImage}
-            resizeMode="cover"
-          />
-        </TouchableOpacity>
-      )}
 
       {/* Filter Tabs w stylu zaokrąglonych pigułek jak na wzorcu */}
       {viewMode !== 'board' && viewMode !== 'saved' && (
@@ -325,6 +322,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     marginBottom: 12,
+  },
+  searchRowCompact: {
+    marginBottom: 4,
   },
   backBtn: {
     width: 56,

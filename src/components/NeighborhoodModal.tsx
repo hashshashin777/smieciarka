@@ -7,11 +7,21 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { THEME, APP_FONT } from '../constants/categories';
-import { NeighborhoodSettings } from '../services/storageCache';
+import {
+  NeighborhoodSettings,
+  NeighborhoodScope,
+  MAX_NEIGHBORHOOD_RADIUS_KM,
+  NEIGHBORHOOD_SCOPE_OPTIONS,
+  clampNeighborhoodRadius,
+  getNeighborhoodScope,
+  getNeighborhoodDisplayValue,
+  getNeighborhoodLabel,
+} from '../services/storageCache';
 
 interface NeighborhoodModalProps {
   visible: boolean;
@@ -22,11 +32,11 @@ interface NeighborhoodModalProps {
 }
 
 const RADIUS_OPTIONS = [
-  { value: 1, label: '1 km', sub: 'Spacer (10 min)' },
-  { value: 2, label: '2 km', sub: 'Rower (5 min)' },
+  { value: 1, label: '1 km', sub: 'Spacer' },
   { value: 5, label: '5 km', sub: 'Dzielnica' },
-  { value: 10, label: '10 km', sub: 'Miasto' },
-  { value: 50, label: 'Bez limitu', sub: 'Wszystko' },
+  { value: 15, label: '15 km', sub: 'Okolica' },
+  { value: 30, label: '30 km', sub: 'Aglomeracja' },
+  { value: 50, label: '50 km', sub: 'Maks. km' },
 ];
 
 export const NeighborhoodModal: React.FC<NeighborhoodModalProps> = ({
@@ -36,31 +46,47 @@ export const NeighborhoodModal: React.FC<NeighborhoodModalProps> = ({
   onSaveSettings,
   itemsInRadiusCount = 0,
 }) => {
-  const [radius, setRadius] = React.useState(settings.radiusKm);
+  const [radius, setRadius] = React.useState(clampNeighborhoodRadius(settings.radiusKm));
+  const [scope, setScope] = React.useState<NeighborhoodScope>(getNeighborhoodScope(settings));
   const [alerts, setAlerts] = React.useState(settings.alertsEnabled);
 
   React.useEffect(() => {
     if (visible) {
-      setRadius(settings.radiusKm);
+      setRadius(clampNeighborhoodRadius(settings.radiusKm));
+      setScope(getNeighborhoodScope(settings));
       setAlerts(settings.alertsEnabled);
     }
   }, [visible, settings]);
 
   const handleSave = () => {
-    const selectedOption = RADIUS_OPTIONS.find((r) => r.value === radius) || RADIUS_OPTIONS[1];
-    onSaveSettings({
+    const nextSettings: NeighborhoodSettings = {
       radiusKm: radius,
+      scope,
       alertsEnabled: alerts,
-      label: radius >= 50 ? 'Całe miasto' : `Promień ${selectedOption.label}`,
-    });
+      label: getNeighborhoodLabel({
+        radiusKm: radius,
+        scope,
+        alertsEnabled: alerts,
+        label: '',
+      }),
+    };
+    const displayValue = getNeighborhoodDisplayValue(nextSettings);
+    onSaveSettings(nextSettings);
     onClose();
     Alert.alert(
       'Mój Rewir zaktualizowany! 📍',
-      alerts 
-        ? `Ustawiono promień ${selectedOption.label}. Otrzymasz alert, gdy ktoś doda nową wystawkę w Twojej okolicy!`
-        : `Ustawiono promień ${selectedOption.label}. Powiadomienia wyłączone.`
+      alerts
+        ? `Ustawiono zasięg: ${displayValue}. Otrzymasz alert, gdy ktoś doda nową wystawkę w wybranym rewirze!`
+        : `Ustawiono zasięg: ${displayValue}. Powiadomienia wyłączone.`
     );
   };
+
+  const currentDisplayValue = getNeighborhoodDisplayValue({
+    radiusKm: radius,
+    scope,
+    alertsEnabled: alerts,
+    label: '',
+  });
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -74,7 +100,7 @@ export const NeighborhoodModal: React.FC<NeighborhoodModalProps> = ({
               </View>
               <View>
                 <Text style={styles.title}>Mój Rewir & Alerty</Text>
-                <Text style={styles.subtitle}>Zdefiniuj swój promień poszukiwań</Text>
+                <Text style={styles.subtitle}>Zdefiniuj swój promień lub obszar poszukiwań</Text>
               </View>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -82,73 +108,119 @@ export const NeighborhoodModal: React.FC<NeighborhoodModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Opcje promienia ze zintegrowanym suwakiem */}
-          <Text style={styles.sectionLabel}>Wybierz zasięg Twojej okolicy:</Text>
-          
-          <View style={styles.sliderContainer}>
-            <View style={styles.sliderHeaderRow}>
-              <Text style={styles.sliderValueText}>
-                Zasięg: <Text style={{ color: '#10B981', fontWeight: '900' }}>{radius >= 50 ? 'Bez limitu (Całe miasto)' : `${radius} km`}</Text>
-              </Text>
-              <Text style={styles.sliderHint}>Przesuń suwak</Text>
+          <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+            {/* Opcje promienia ze zintegrowanym suwakiem (1 - 50 km) */}
+            <Text style={styles.sectionLabel}>Wybierz odległość (1 – 50 km):</Text>
+
+            <View style={styles.sliderContainer}>
+              <View style={styles.sliderHeaderRow}>
+                <Text style={styles.sliderValueText}>
+                  Zasięg: <Text style={{ color: '#10B981', fontWeight: '900' }}>{currentDisplayValue}</Text>
+                </Text>
+                <Text style={styles.sliderHint}>Przesuń suwak</Text>
+              </View>
+              <Slider
+                style={styles.modalSlider}
+                minimumValue={1}
+                maximumValue={MAX_NEIGHBORHOOD_RADIUS_KM}
+                step={1}
+                value={radius}
+                onValueChange={(val) => {
+                  setRadius(val);
+                  setScope('radius');
+                }}
+                minimumTrackTintColor={scope === 'radius' ? '#10B981' : '#94A3B8'}
+                maximumTrackTintColor="#E2E8F0"
+                thumbTintColor={scope === 'radius' ? '#059669' : '#64748B'}
+              />
+              <View style={styles.sliderTicksRow}>
+                <Text style={styles.sliderTickText}>1 km</Text>
+                <Text style={styles.sliderTickText}>25 km</Text>
+                <Text style={styles.sliderTickText}>50 km</Text>
+              </View>
             </View>
-            <Slider
-              style={styles.modalSlider}
-              minimumValue={1}
-              maximumValue={25}
-              step={1}
-              value={radius > 25 ? 25 : radius}
-              onValueChange={(val) => setRadius(val)}
-              minimumTrackTintColor="#10B981"
-              maximumTrackTintColor="#E2E8F0"
-              thumbTintColor="#059669"
-            />
-          </View>
 
-          <View style={styles.optionsGrid}>
-            {RADIUS_OPTIONS.map((opt) => {
-              const isSelected = radius === opt.value;
-              return (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={[styles.radiusCard, isSelected && styles.radiusCardSelected]}
-                  onPress={() => setRadius(opt.value)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.radiusVal, isSelected && styles.radiusValSelected]}>
-                    {opt.label}
-                  </Text>
-                  <Text style={[styles.radiusSub, isSelected && styles.radiusSubSelected]}>
-                    {opt.sub}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+            <View style={styles.optionsGrid}>
+              {RADIUS_OPTIONS.map((opt) => {
+                const isSelected = scope === 'radius' && radius === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[styles.radiusCard, isSelected && styles.radiusCardSelected]}
+                    onPress={() => {
+                      setRadius(opt.value);
+                      setScope('radius');
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.radiusVal, isSelected && styles.radiusValSelected]}>
+                      {opt.label}
+                    </Text>
+                    <Text style={[styles.radiusSub, isSelected && styles.radiusSubSelected]}>
+                      {opt.sub}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
-          {/* Przełącznik powiadomień */}
-          <View style={styles.toggleRow}>
-            <View style={{ flex: 1, marginRight: 12 }}>
-              <Text style={styles.toggleTitle}>Alerty o nowych wystawkach</Text>
-              <Text style={styles.toggleSub}>
-                Powiadom mnie natychmiast, gdy sąsiad wystawi meble lub sprzęt w moim rewirze
+            {/* Opcje obszaru: Całe miasto, Całe województwo, Cała Polska */}
+            <Text style={styles.sectionLabel}>Lub wybierz szerszy obszar:</Text>
+            <View style={styles.scopeGrid}>
+              {NEIGHBORHOOD_SCOPE_OPTIONS.map((opt) => {
+                const isSelected = scope === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={[styles.scopeCard, isSelected && styles.scopeCardSelected]}
+                    onPress={() => setScope(opt.id)}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialCommunityIcons
+                      name={opt.icon}
+                      size={18}
+                      color={isSelected ? '#059669' : '#64748B'}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.scopeCardTitle, isSelected && styles.radiusValSelected]}>
+                        {opt.label}
+                      </Text>
+                      <Text style={[styles.scopeCardSub, isSelected && styles.radiusSubSelected]}>
+                        {opt.sub}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <MaterialCommunityIcons name="check-circle" size={18} color="#10B981" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Przełącznik powiadomień */}
+            <View style={styles.toggleRow}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={styles.toggleTitle}>Alerty o nowych wystawkach</Text>
+                <Text style={styles.toggleSub}>
+                  Powiadom mnie natychmiast, gdy sąsiad wystawi meble lub sprzęt w moim rewirze
+                </Text>
+              </View>
+              <Switch
+                value={alerts}
+                onValueChange={setAlerts}
+                trackColor={{ false: '#CBD5E1', true: '#A7F3D0' }}
+                thumbColor={alerts ? '#10B981' : '#F1F5F9'}
+              />
+            </View>
+
+            {/* Info o znalezionych przedmiotach */}
+            <View style={styles.infoBanner}>
+              <MaterialCommunityIcons name="information-outline" size={18} color="#059669" />
+              <Text style={styles.infoBannerText}>
+                W wybranym rewirze jest obecnie aktywnych: <Text style={{ fontWeight: '800' }}>{itemsInRadiusCount}</Text> wystawek i ofert.
               </Text>
             </View>
-            <Switch
-              value={alerts}
-              onValueChange={setAlerts}
-              trackColor={{ false: '#CBD5E1', true: '#A7F3D0' }}
-              thumbColor={alerts ? '#10B981' : '#F1F5F9'}
-            />
-          </View>
-
-          {/* Info o znalezionych przedmiotach */}
-          <View style={styles.infoBanner}>
-            <MaterialCommunityIcons name="information-outline" size={18} color="#059669" />
-            <Text style={styles.infoBannerText}>
-              W wybranym rewirze jest obecnie aktywnych: <Text style={{ fontWeight: '800' }}>{itemsInRadiusCount}</Text> wystawek i ofert.
-            </Text>
-          </View>
+          </ScrollView>
 
           {/* Zapisz */}
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
@@ -171,7 +243,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
-    paddingBottom: 36,
+    paddingBottom: 32,
+    maxHeight: '90%',
   },
   header: {
     flexDirection: 'row',
@@ -247,17 +320,29 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 34,
   },
+  sliderTicksRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  sliderTickText: {
+    fontFamily: APP_FONT,
+    fontSize: 10.5,
+    color: '#64748B',
+    fontWeight: '600',
+  },
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 18,
+    marginBottom: 14,
   },
   radiusCard: {
-    width: '31%',
+    flexGrow: 1,
+    minWidth: '17%',
     backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    paddingVertical: 12,
+    borderRadius: 12,
+    paddingVertical: 10,
     paddingHorizontal: 6,
     alignItems: 'center',
     borderWidth: 1.5,
@@ -269,7 +354,7 @@ const styles = StyleSheet.create({
   },
   radiusVal: {
     fontFamily: APP_FONT,
-    fontSize: 15,
+    fontSize: 13.5,
     fontWeight: '800',
     color: '#334155',
   },
@@ -278,13 +363,43 @@ const styles = StyleSheet.create({
   },
   radiusSub: {
     fontFamily: APP_FONT,
-    fontSize: 10.5,
+    fontSize: 10,
     color: '#64748B',
     marginTop: 2,
   },
   radiusSubSelected: {
     color: '#047857',
     fontWeight: '600',
+  },
+  scopeGrid: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  scopeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  scopeCardSelected: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#10B981',
+  },
+  scopeCardTitle: {
+    fontFamily: APP_FONT,
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  scopeCardSub: {
+    fontFamily: APP_FONT,
+    fontSize: 11,
+    color: '#64748B',
   },
   toggleRow: {
     flexDirection: 'row',

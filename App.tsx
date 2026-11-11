@@ -46,6 +46,9 @@ import {
   StorageCache,
   EcoStats,
   NeighborhoodSettings,
+  clampNeighborhoodRadius,
+  getNeighborhoodLabel,
+  isDistanceInNeighborhood,
 } from './src/services/storageCache';
 import {
   fetchItemsFromCloud,
@@ -141,6 +144,7 @@ export default function App() {
   // Mój Rewir & Geofencing (Moduł B)
   const [neighborhoodSettings, setNeighborhoodSettings] = useState<NeighborhoodSettings>({
     radiusKm: 2,
+    scope: 'radius',
     alertsEnabled: true,
     label: 'Mój rewir (2 km)',
   });
@@ -319,11 +323,14 @@ export default function App() {
 
   const itemsInRadiusCount = items.filter((item) => {
     if (!isItemActive(item)) return false;
-    if (userCoords && neighborhoodSettings.radiusKm < 50) {
-      const dist = calculateDistance(userCoords.latitude, userCoords.longitude, item.location.latitude, item.location.longitude).value;
-      return dist <= neighborhoodSettings.radiusKm;
-    }
-    return true;
+    if (!userCoords) return true;
+    const dist = calculateDistance(
+      userCoords.latitude,
+      userCoords.longitude,
+      item.location.latitude,
+      item.location.longitude
+    ).value;
+    return isDistanceInNeighborhood(dist, neighborhoodSettings);
   }).length;
 
   const wystawkaCount = items.filter((i) => isItemActive(i) && i.type === 'wystawka').length;
@@ -583,10 +590,28 @@ export default function App() {
               neighborhoodSettings={neighborhoodSettings}
               onOpenNeighborhoodModal={() => setIsNeighborhoodModalVisible(true)}
               onChangeRadius={(val) => {
+                const clamped = clampNeighborhoodRadius(val);
                 const updated: NeighborhoodSettings = {
                   ...neighborhoodSettings,
-                  radiusKm: val,
-                  label: val >= 20 ? 'Całe miasto' : `Promień ${val} km`,
+                  radiusKm: clamped,
+                  scope: 'radius',
+                  label: getNeighborhoodLabel({
+                    ...neighborhoodSettings,
+                    radiusKm: clamped,
+                    scope: 'radius',
+                  }),
+                };
+                setNeighborhoodSettings(updated);
+                StorageCache.saveNeighborhoodSettings(updated);
+              }}
+              onSelectNeighborhoodScope={(scope) => {
+                const updated: NeighborhoodSettings = {
+                  ...neighborhoodSettings,
+                  scope,
+                  label: getNeighborhoodLabel({
+                    ...neighborhoodSettings,
+                    scope,
+                  }),
                 };
                 setNeighborhoodSettings(updated);
                 StorageCache.saveNeighborhoodSettings(updated);
@@ -900,9 +925,9 @@ export default function App() {
                       end={{ x: 1, y: 1 }}
                       style={styles.navTabPillGradientCircle}
                     >
-                      <MaterialCommunityIcons name={tab.activeIcon} size={19} color="#FFFFFF" />
+                      <MaterialCommunityIcons name={tab.activeIcon} size={22} color="#FFFFFF" />
                     </LinearGradient>
-                    <Text style={styles.navTabPillText}>
+                    <Text style={styles.navTabPillText} numberOfLines={1}>
                       {tab.label.toUpperCase()}
                     </Text>
                     {badgeCount > 0 && (
@@ -936,7 +961,7 @@ export default function App() {
                 >
                   <MaterialCommunityIcons
                     name={tab.inactiveIcon}
-                    size={21}
+                    size={25}
                     color="#64748B"
                   />
                   {badgeCount > 0 && (
@@ -1082,7 +1107,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingTop: 10,
-    paddingBottom: 110, // Zoptymalizowana przestrzeń pod nowoczesny dolny pasek nawigacyjny
+    paddingBottom: 125, // Zoptymalizowana przestrzeń pod powiększony dolny pasek nawigacyjny
   },
   listFiltersContainer: {
     marginBottom: 12,
@@ -1146,37 +1171,38 @@ const styles = StyleSheet.create({
   },
   bottomNavWrapper: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 22 : 16,
-    left: 8,
-    right: 8,
+    bottom: Platform.OS === 'ios' ? 20 : 12,
+    left: 10,
+    right: 10,
     zIndex: 30,
     alignItems: 'center',
   },
   modernBottomBar: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    backgroundColor: 'rgba(241, 245, 249, 0.72)',
-    borderRadius: 30,
-    paddingVertical: 5,
-    paddingHorizontal: 6,
+    justifyContent: 'space-between',
+    gap: 6,
+    backgroundColor: 'rgba(241, 245, 249, 0.92)',
+    borderRadius: 34,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 14,
     elevation: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.85)',
+    borderColor: 'rgba(255, 255, 255, 0.9)',
   },
   modernBottomBarDark: {
     backgroundColor: 'rgba(15, 23, 42, 0.82)',
     borderColor: 'rgba(51, 65, 85, 0.6)',
   },
   navTabCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1196,11 +1222,12 @@ const styles = StyleSheet.create({
   navTabPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 44,
-    borderRadius: 22,
+    flexShrink: 1,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#FFFFFF',
-    paddingLeft: 4,
-    paddingRight: 13,
+    paddingLeft: 5,
+    paddingRight: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
@@ -1215,19 +1242,19 @@ const styles = StyleSheet.create({
     borderColor: '#334155',
   },
   navTabPillGradientCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   navTabPillText: {
     fontFamily: APP_FONT,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     color: '#0F172A',
-    letterSpacing: 0.7,
-    marginLeft: 7,
+    letterSpacing: 0.6,
+    marginLeft: 8,
   },
   navTabPillTextDark: {
     color: '#F8FAFC',
@@ -1237,9 +1264,9 @@ const styles = StyleSheet.create({
     top: -2,
     right: -2,
     backgroundColor: THEME.starYellow,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
@@ -1249,9 +1276,9 @@ const styles = StyleSheet.create({
   navStarBadgePill: {
     marginLeft: 6,
     backgroundColor: THEME.starYellow,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
@@ -1374,7 +1401,7 @@ const styles = StyleSheet.create({
   navStarBadgeText: {
     fontFamily: APP_FONT,
     color: '#78350F',
-    fontSize: 8.5,
+    fontSize: 9.5,
     fontWeight: '900',
   },
   emptyContainer: {

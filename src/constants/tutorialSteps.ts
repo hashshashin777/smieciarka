@@ -47,7 +47,7 @@ export const TUTORIAL_STEPS: TutorialStepConfig[] = [
     totalSteps: 5,
     targetId: 'rewir',
     title: 'Mój rewir i alerty sąsiedzkie',
-    description: 'Przesuń suwak, aby ustawić promień poszukiwań (od spaceru 1 km do 20 km) i włącz powiadomienia, by jako pierwszy wiedzieć o wystawkach w Twoim sąsiedztwie.',
+    description: 'Przesuń suwak, aby ustawić promień poszukiwań (od 1 km do 50 km) lub wybierz całe miasto, województwo czy całą Polskę i włącz powiadomienia o nowych wystawkach.',
     icon: 'map-marker-radius',
     iconColor: '#10B981',
     arrowPosition: 'top',

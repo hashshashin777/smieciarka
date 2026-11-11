@@ -15,7 +15,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { PostItem, ItemType, UserProfile } from '../types';
 import { THEME, GRADIENTS, APP_FONT } from '../constants/categories';
 import { EcoImpactCard } from './EcoImpactCard';
-import { EcoStats, NeighborhoodSettings } from '../services/storageCache';
+import {
+  EcoStats,
+  NeighborhoodSettings,
+  NeighborhoodScope,
+  MAX_NEIGHBORHOOD_RADIUS_KM,
+  NEIGHBORHOOD_SCOPE_OPTIONS,
+  clampNeighborhoodRadius,
+  getNeighborhoodScope,
+  getNeighborhoodDisplayValue,
+  getNeighborhoodSubtitle,
+} from '../services/storageCache';
 import { TutorialTooltip } from './TutorialTooltip';
 import { TUTORIAL_STEPS } from '../constants/tutorialSteps';
 
@@ -38,6 +48,7 @@ interface YanosikDashboardProps {
   neighborhoodSettings?: NeighborhoodSettings;
   onOpenNeighborhoodModal?: () => void;
   onChangeRadius?: (newRadius: number) => void;
+  onSelectNeighborhoodScope?: (scope: Exclude<NeighborhoodScope, 'radius'>) => void;
   currentUser?: UserProfile | null;
   onOpenLogin?: () => void;
   onSignOut?: () => void;
@@ -64,9 +75,10 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
   usersCount = 128,
   ecoStats = { itemsRescued: 2, co2SavedKg: 28, postsCreated: 1 },
   streakDays = 3,
-  neighborhoodSettings = { radiusKm: 2, alertsEnabled: true, label: 'Mój rewir (2 km)' },
+  neighborhoodSettings = { radiusKm: 2, scope: 'radius', alertsEnabled: true, label: 'Mój rewir (2 km)' },
   onOpenNeighborhoodModal,
   onChangeRadius,
+  onSelectNeighborhoodScope,
   currentUser,
   onOpenLogin,
   onSignOut,
@@ -288,17 +300,11 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={[styles.rewirTitle, isDark && styles.textWhite]}>
-                        Mój rewir: <Text style={{ color: '#059669', fontWeight: '900' }}>{neighborhoodSettings.radiusKm >= 20 ? 'Całe miasto' : `${neighborhoodSettings.radiusKm} km`}</Text>
+                        Mój rewir: <Text style={{ color: '#059669', fontWeight: '900' }}>{getNeighborhoodDisplayValue(neighborhoodSettings)}</Text>
                       </Text>
                     </View>
                     <Text style={styles.rewirSub}>
-                      {neighborhoodSettings.radiusKm <= 1
-                        ? 'Krótki spacer (10 min)'
-                        : neighborhoodSettings.radiusKm <= 3
-                        ? 'Rower / szybki dojazd (5-10 min)'
-                        : neighborhoodSettings.radiusKm <= 7
-                        ? 'Twoja dzielnica'
-                        : 'Szeroka okolica miasta'}
+                      {getNeighborhoodSubtitle(neighborhoodSettings)}
                     </Text>
                   </View>
                 </View>
@@ -320,25 +326,49 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                 </TouchableOpacity>
               </View>
 
-              {/* Suwak regulacji zasięgu */}
+              {/* Suwak regulacji zasięgu (1 - 50 km) */}
               <View style={styles.sliderSection}>
                 <Slider
                   style={styles.slider}
                   minimumValue={1}
-                  maximumValue={20}
+                  maximumValue={MAX_NEIGHBORHOOD_RADIUS_KM}
                   step={1}
-                  value={neighborhoodSettings.radiusKm}
+                  value={clampNeighborhoodRadius(neighborhoodSettings.radiusKm)}
                   onValueChange={(val) => onChangeRadius?.(val)}
-                  minimumTrackTintColor="#10B981"
+                  minimumTrackTintColor={getNeighborhoodScope(neighborhoodSettings) === 'radius' ? '#10B981' : '#94A3B8'}
                   maximumTrackTintColor={isDark ? '#334155' : '#E2E8F0'}
-                  thumbTintColor="#059669"
+                  thumbTintColor={getNeighborhoodScope(neighborhoodSettings) === 'radius' ? '#059669' : '#64748B'}
                 />
                 <View style={styles.sliderLabelsRow}>
                   <Text style={styles.sliderLabelMin}>1 km</Text>
-                  <Text style={styles.sliderLabelMid}>5 km</Text>
-                  <Text style={styles.sliderLabelMid}>10 km</Text>
-                  <Text style={styles.sliderLabelMax}>20 km</Text>
+                  <Text style={styles.sliderLabelMid}>15 km</Text>
+                  <Text style={styles.sliderLabelMid}>30 km</Text>
+                  <Text style={styles.sliderLabelMax}>50 km</Text>
                 </View>
+              </View>
+
+              {/* Szybki wybór szerszego obszaru: Całe miasto / Całe województwo / Cała Polska */}
+              <View style={styles.scopeChipsRow}>
+                {NEIGHBORHOOD_SCOPE_OPTIONS.map((opt) => {
+                  const isActive = getNeighborhoodScope(neighborhoodSettings) === opt.id;
+                  return (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={[styles.scopeChip, isActive && styles.scopeChipActive]}
+                      onPress={() => onSelectNeighborhoodScope?.(opt.id)}
+                      activeOpacity={0.8}
+                    >
+                      <MaterialCommunityIcons
+                        name={opt.icon}
+                        size={13}
+                        color={isActive ? '#FFFFFF' : '#475569'}
+                      />
+                      <Text style={[styles.scopeChipText, isActive && styles.scopeChipTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </LinearGradient>
 
@@ -369,11 +399,11 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
               end={{ x: 1, y: 1 }}
               style={styles.gridTile}
             >
+              <View style={[styles.tileBadgePlus, { backgroundColor: '#F59E0B' }]}>
+                <Text style={styles.plusText}>{wystawkaCount}</Text>
+              </View>
               <View style={styles.tileIconContainer}>
                 <MaterialCommunityIcons name="dump-truck" size={28} color="#F59E0B" />
-                <View style={[styles.tileBadgePlus, { backgroundColor: '#F59E0B' }]}>
-                  <Text style={styles.plusText}>{wystawkaCount}</Text>
-                </View>
               </View>
               <Text style={styles.tileLabel}>Wystawki</Text>
             </LinearGradient>
@@ -391,11 +421,11 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
               end={{ x: 1, y: 1 }}
               style={styles.gridTile}
             >
+              <View style={[styles.tileBadgePlus, { backgroundColor: '#059669' }]}>
+                <Text style={[styles.plusText, { color: '#FFFFFF' }]}>{oddamCount}</Text>
+              </View>
               <View style={styles.tileIconContainer}>
                 <MaterialCommunityIcons name="gift" size={28} color="#059669" />
-                <View style={[styles.tileBadgePlus, { backgroundColor: '#059669' }]}>
-                  <Text style={[styles.plusText, { color: '#FFFFFF' }]}>{oddamCount}</Text>
-                </View>
               </View>
               <Text style={styles.tileLabel}>Oddam</Text>
             </LinearGradient>
@@ -432,10 +462,13 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
               end={{ x: 1, y: 1 }}
               style={styles.gridTile}
             >
+              <View style={[styles.tileBadgePlus, { backgroundColor: THEME.starYellow }]}>
+                <Text style={[styles.plusText, { color: '#78350F' }]}>{savedCount}</Text>
+              </View>
               <View style={styles.tileIconContainer}>
                 <MaterialCommunityIcons name="star" size={28} color={THEME.starYellow} />
               </View>
-              <Text style={styles.tileLabel}>Zapisane ({savedCount})</Text>
+              <Text style={styles.tileLabel}>Zapisane</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -588,7 +621,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 110,
+    paddingBottom: 125,
   },
   // Status konta / Gość
   authStatusBar: {
@@ -854,6 +887,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#64748B',
   },
+  scopeChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 10,
+  },
+  scopeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  scopeChipActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  scopeChipText: {
+    fontFamily: APP_FONT,
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  scopeChipTextActive: {
+    color: '#FFFFFF',
+  },
 
   // 3. Quick 4 Tiles
   quickGridRow: {
@@ -872,6 +935,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   gridTile: {
+    position: 'relative',
     width: '100%',
     height: '100%',
     borderRadius: 14,
@@ -883,26 +947,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   tileIconContainer: {
-    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
   },
   tileBadgePlus: {
     position: 'absolute',
-    top: -3,
-    right: -9,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    top: 5,
+    right: 5,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
+    zIndex: 2,
   },
   plusText: {
     fontFamily: APP_FONT,
     color: '#FFFFFF',
-    fontSize: 8.5,
+    fontSize: 9.5,
     fontWeight: '800',
   },
   tileLabel: {

@@ -12,12 +12,43 @@ interface EcoImpactCardProps {
   style?: any;
 }
 
+const WEEKDAYS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
+const MONTHS_SHORT_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
+
+function getCalendarWeekDays(streakDays: number) {
+  const now = new Date();
+  const todayIndex = (now.getDay() + 6) % 7; // 0 = Pn .. 6 = Nd
+  const monday = new Date(now);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(now.getDate() - todayIndex);
+
+  const days = WEEKDAYS.map((label, idx) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + idx);
+    const isToday = idx === todayIndex;
+    const isCompleted = idx <= todayIndex && todayIndex - idx < Math.max(streakDays, 1);
+    const isFuture = idx > todayIndex;
+
+    return {
+      label,
+      dayNumber: date.getDate(),
+      isToday,
+      isCompleted,
+      isFuture,
+    };
+  });
+
+  const todayFormatted = `${WEEKDAYS[todayIndex]}, ${now.getDate()} ${MONTHS_SHORT_PL[now.getMonth()]}`;
+  return { days, todayFormatted };
+}
+
 export const EcoImpactCard: React.FC<EcoImpactCardProps> = ({
   stats,
   streakDays = 3,
   isDark = false,
   style,
 }) => {
+  const { days: calendarDays, todayFormatted } = getCalendarWeekDays(streakDays);
   const getRank = (rescued: number) => {
     if (rescued >= 10) return { title: 'Bohater Zero-Waste', icon: 'shield-crown', color: '#10B981' };
     if (rescued >= 5) return { title: 'Mistrz Drugiego Życia', icon: 'medal', color: '#F59E0B' };
@@ -105,62 +136,77 @@ export const EcoImpactCard: React.FC<EcoImpactCardProps> = ({
         </LinearGradient>
       </View>
 
-      {/* Licznik Dni z Rzędu (Streak Habit - Moduł Aktywności) */}
+      {/* Licznik Dni z Rzędu (Nowy wariant graficzny + dzisiejszy dzień wg kalendarza) */}
       <LinearGradient
-        colors={isDark ? ['#241913', '#150E0B'] : ['#FFF7ED', '#FFEDD5']}
+        colors={isDark ? ['#0F2922', '#091815'] : ['#064E3B', '#047857']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.streakContainer, isDark && styles.streakContainerDark]}
       >
         <View style={styles.streakTopRow}>
           <View style={styles.flameIconBox}>
-            <MaterialCommunityIcons name="fire" size={22} color="#EA580C" />
+            <MaterialCommunityIcons name="fire" size={22} color="#FBBF24" />
           </View>
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={[styles.streakTitle, isDark && styles.textWhite]}>
-                Seria: <Text style={styles.streakHighlight}>{streakDays} {streakDays === 1 ? 'dzień' : streakDays < 5 ? 'dni' : 'dni'} z rzędu!</Text>
-              </Text>
-              <View style={styles.streakBadgeMini}>
-                <Text style={styles.streakBadgeMiniText}>🔥 Aktywny</Text>
-              </View>
-            </View>
+            <Text style={styles.streakTitle}>
+              Seria: <Text style={styles.streakHighlight}>{streakDays} {streakDays === 1 ? 'dzień' : 'dni'} z rzędu</Text>
+            </Text>
             <Text style={styles.streakSub}>
               {streakDays >= 5
-                ? 'Niesamowita regularność! Jesteś filarem sąsiedzkiego zero-waste.'
-                : 'Świetna passa! Wracaj codziennie, by upolować nowe wystawki.'}
+                ? 'Świetna regularność Zero-Waste!'
+                : 'Wracaj codziennie po nowe wystawki'}
             </Text>
+          </View>
+          <View style={styles.calendarDateBadge}>
+            <MaterialCommunityIcons name="calendar-today" size={12} color="#FDE68A" />
+            <Text style={styles.calendarDateText}>{todayFormatted}</Text>
           </View>
         </View>
 
-        {/* 7 Dni tygodnia */}
-        <View style={styles.weekPillsRow}>
-          {['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'].map((day, idx) => {
-            const isActive = idx < Math.min(streakDays, 7);
-            return (
-              <View
-                key={day}
+        {/* Tydzień kalendarzowy (Pn - Nd) z zaznaczonym dzisiejszym dniem */}
+        <View style={styles.weekCalendarRow}>
+          {calendarDays.map((day) => (
+            <View key={day.label} style={styles.calendarDayCol}>
+              <Text
                 style={[
-                  styles.dayPill,
-                  isActive && styles.dayPillActive,
-                  isDark && !isActive && styles.dayPillDark,
+                  styles.calendarWeekdayLabel,
+                  day.isToday && styles.calendarWeekdayLabelToday,
+                  day.isFuture && styles.calendarWeekdayLabelFuture,
+                ]}
+              >
+                {day.label}
+              </Text>
+              <View
+                style={[
+                  styles.calendarCircle,
+                  day.isCompleted && !day.isToday && styles.calendarCircleDone,
+                  day.isToday && styles.calendarCircleToday,
+                  day.isFuture && styles.calendarCircleFuture,
                 ]}
               >
                 <Text
                   style={[
-                    styles.dayPillText,
-                    isActive && styles.dayPillTextActive,
-                    isDark && !isActive && styles.dayPillTextDark,
+                    styles.calendarDayNumber,
+                    day.isCompleted && !day.isToday && styles.calendarDayNumberDone,
+                    day.isToday && styles.calendarDayNumberToday,
+                    day.isFuture && styles.calendarDayNumberFuture,
                   ]}
                 >
-                  {day}
+                  {day.dayNumber}
                 </Text>
-                {isActive && (
-                  <MaterialCommunityIcons name="check" size={10} color="#FFFFFF" />
+                {day.isCompleted && !day.isToday && (
+                  <View style={styles.calendarDoneDot}>
+                    <MaterialCommunityIcons name="check" size={8} color="#064E3B" />
+                  </View>
                 )}
               </View>
-            );
-          })}
+              {day.isToday ? (
+                <Text style={styles.todayTag}>DZIŚ</Text>
+              ) : (
+                <View style={styles.todayTagSpacer} />
+              )}
+            </View>
+          ))}
         </View>
       </LinearGradient>
     </LinearGradient>
@@ -274,95 +320,160 @@ const styles = StyleSheet.create({
   },
   streakContainer: {
     marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(52, 211, 153, 0.3)',
+    shadowColor: '#064E3B',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 3,
   },
   streakContainerDark: {
-    borderTopColor: '#1E293B',
+    borderColor: 'rgba(16, 185, 129, 0.35)',
   },
   streakTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   flameIconBox: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: 'rgba(251, 191, 36, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#FFEDD5',
+    borderColor: 'rgba(251, 191, 36, 0.45)',
   },
   streakTitle: {
     fontFamily: APP_FONT,
     fontSize: 13.5,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#ECFDF5',
   },
   streakHighlight: {
-    color: '#EA580C',
+    color: '#FDE68A',
     fontWeight: '900',
-  },
-  streakBadgeMini: {
-    backgroundColor: '#FFEDD5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  streakBadgeMiniText: {
-    fontFamily: APP_FONT,
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#C2410C',
   },
   streakSub: {
     fontFamily: APP_FONT,
     fontSize: 11,
-    color: '#64748B',
-    marginTop: 2,
-    lineHeight: 15,
+    color: '#A7F3D0',
+    marginTop: 1,
   },
-  weekPillsRow: {
+  calendarDateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(253, 230, 138, 0.35)',
+  },
+  calendarDateText: {
+    fontFamily: APP_FONT,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FEF3C7',
+  },
+  weekCalendarRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 4,
-    marginTop: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.16)',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
   },
-  dayPill: {
+  calendarDayCol: {
     flex: 1,
-    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  calendarWeekdayLabel: {
+    fontFamily: APP_FONT,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#A7F3D0',
+    marginBottom: 5,
+  },
+  calendarWeekdayLabelToday: {
+    color: '#FDE68A',
+    fontWeight: '900',
+  },
+  calendarWeekdayLabelFuture: {
+    color: 'rgba(167, 243, 208, 0.5)',
+  },
+  calendarCircle: {
+    position: 'relative',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    paddingVertical: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
   },
-  dayPillActive: {
-    backgroundColor: '#EA580C',
-    borderColor: '#C2410C',
+  calendarCircleDone: {
+    backgroundColor: '#10B981',
+    borderColor: '#6EE7B7',
   },
-  dayPillDark: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
+  calendarCircleToday: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#FBBF24',
+    shadowColor: '#FBBF24',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  dayPillText: {
+  calendarCircleFuture: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  calendarDayNumber: {
     fontFamily: APP_FONT,
-    fontSize: 10.5,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  dayPillTextActive: {
-    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '800',
+    color: '#ECFDF5',
   },
-  dayPillTextDark: {
-    color: '#94A3B8',
+  calendarDayNumberDone: {
+    color: '#FFFFFF',
+  },
+  calendarDayNumberToday: {
+    color: '#064E3B',
+    fontWeight: '900',
+  },
+  calendarDayNumberFuture: {
+    color: 'rgba(236, 253, 245, 0.45)',
+  },
+  calendarDoneDot: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 13,
+    height: 13,
+    borderRadius: 6.5,
+    backgroundColor: '#FDE68A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  todayTag: {
+    fontFamily: APP_FONT,
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: '#FDE68A',
+    marginTop: 4,
+    letterSpacing: 0.4,
+  },
+  todayTagSpacer: {
+    height: 14,
   },
 });
