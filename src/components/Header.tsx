@@ -2,7 +2,9 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Image, ScrollView, Linking } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { THEME, APP_FONT } from '../constants/categories';
+import { CustomBannerImages, resolveBannerSource } from '../constants/banners';
 import { ItemType } from '../types';
+import { safeOpenUrl } from '../utils/helpers';
 
 interface HeaderProps {
   filterType: 'all' | ItemType;
@@ -15,6 +17,8 @@ interface HeaderProps {
   usersCount?: number;
   onGoBackToHome?: () => void;
   isDark?: boolean;
+  adsEnabled?: boolean;
+  customBanners?: CustomBannerImages;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -28,11 +32,13 @@ export const Header: React.FC<HeaderProps> = ({
   usersCount = 128,
   onGoBackToHome,
   isDark = false,
+  adsEnabled = true,
+  customBanners,
 }) => {
   return (
     <View style={[styles.container, isDark && styles.containerDark]}>
       {/* 1. Reklamy na samej górze (nad search barem) w zakładkach Mapa, Lista, Tablica i Zapisane */}
-      {viewMode === 'map' && (
+      {adsEnabled && viewMode === 'map' && (
         <TouchableOpacity
           style={styles.adBannerCard}
           activeOpacity={0.9}
@@ -45,14 +51,14 @@ export const Header: React.FC<HeaderProps> = ({
           }
         >
           <Image
-            source={require('../assets/map_ad_banner.webp')}
+            source={resolveBannerSource('map', customBanners)}
             style={styles.adBannerImage}
             resizeMode="cover"
           />
         </TouchableOpacity>
       )}
 
-      {viewMode === 'list' && (
+      {adsEnabled && viewMode === 'list' && (
         <TouchableOpacity
           style={[styles.adBannerCard, styles.listAdBannerCard]}
           activeOpacity={0.9}
@@ -61,21 +67,21 @@ export const Header: React.FC<HeaderProps> = ({
               'sprawdzto24.pl 🧪',
               'Testy użyteczności stron i sklepów internetowych z perspektywy klientów.\n\nCzy chcesz przejść do serwisu sprawdzto24.pl?',
               [
-                { text: 'Otwórz sprawdzto24.pl', onPress: () => Linking.openURL('https://sprawdzto24.pl') },
+                { text: 'Otwórz sprawdzto24.pl', onPress: () => void safeOpenUrl('https://sprawdzto24.pl') },
                 { text: 'Zamknij', style: 'cancel' },
               ]
             );
           }}
         >
           <Image
-            source={require('../assets/list_ad_banner.gif')}
+            source={resolveBannerSource('list', customBanners)}
             style={styles.adBannerImage}
             resizeMode="cover"
           />
         </TouchableOpacity>
       )}
 
-      {viewMode === 'board' && (
+      {adsEnabled && viewMode === 'board' && (
         <TouchableOpacity
           style={[styles.adBannerCard, styles.boardAdBannerCard]}
           activeOpacity={0.9}
@@ -84,21 +90,21 @@ export const Header: React.FC<HeaderProps> = ({
               'scraperek.online 🚀',
               'Automatyczne wyszukiwanie firm i zbieranie kontaktów B2B (Google, Facebook, Instagram).\n\nCzy chcesz przejść do serwisu scraperek.online?',
               [
-                { text: 'Otwórz scraperek.online', onPress: () => Linking.openURL('https://scraperek.online') },
+                { text: 'Otwórz scraperek.online', onPress: () => void safeOpenUrl('https://scraperek.online') },
                 { text: 'Zamknij', style: 'cancel' },
               ]
             );
           }}
         >
           <Image
-            source={require('../assets/board_ad_banner.gif')}
+            source={resolveBannerSource('board', customBanners)}
             style={styles.adBannerImage}
             resizeMode="cover"
           />
         </TouchableOpacity>
       )}
 
-      {viewMode === 'saved' && (
+      {adsEnabled && viewMode === 'saved' && (
         <TouchableOpacity
           style={[styles.adBannerCard, styles.savedAdBannerCard]}
           activeOpacity={0.9}
@@ -121,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
           }}
         >
           <Image
-            source={require('../assets/saved_ad_banner.gif')}
+            source={resolveBannerSource('saved', customBanners)}
             style={styles.adBannerImage}
             resizeMode="cover"
           />
@@ -161,13 +167,15 @@ export const Header: React.FC<HeaderProps> = ({
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {searchQuery.length > 0 ? (
-            <TouchableOpacity onPress={() => onSearchChange('')} style={{ padding: 4 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => onSearchChange('')}
+              style={{ padding: 4 }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Wyczyść wyszukiwanie"
+            >
               <MaterialCommunityIcons name="close-circle" size={22} color="#94A3B8" />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={styles.micBtn} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="microphone" size={24} color={isDark ? '#94A3B8' : '#475569'} />
             </TouchableOpacity>
           )}
         </View>
@@ -367,9 +375,6 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     fontWeight: '500',
     height: '100%',
-  },
-  micBtn: {
-    padding: 6,
   },
   clearBtn: {
     padding: 4,

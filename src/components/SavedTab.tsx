@@ -15,6 +15,8 @@ import { BoardCard } from './BoardCard';
 interface SavedTabProps {
   savedItems: PostItem[];
   savedBoardPosts: BoardPost[];
+  likedPostIds?: string[];
+  onLikeToggle?: (postId: string) => void;
   userCoords?: { latitude: number; longitude: number } | null;
   onOpenItemDetail: (item: PostItem) => void;
   onToggleSaveItem: (itemId: string) => void;
@@ -25,6 +27,8 @@ interface SavedTabProps {
 export const SavedTab: React.FC<SavedTabProps> = ({
   savedItems,
   savedBoardPosts,
+  likedPostIds = [],
+  onLikeToggle,
   userCoords,
   onOpenItemDetail,
   onToggleSaveItem,
@@ -103,11 +107,24 @@ export const SavedTab: React.FC<SavedTabProps> = ({
             return (
               <BoardCard
                 post={item.data}
+                isLiked={likedPostIds.includes(item.data.id)}
+                onLikeToggle={onLikeToggle}
                 isSaved={true}
                 onToggleSave={() => onToggleSavePost(item.data.id)}
               />
             );
           }}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <View style={styles.starCircle}>
+                <MaterialCommunityIcons name="star-outline" size={44} color={THEME.starYellow} />
+              </View>
+              <Text style={styles.emptyTitle}>Brak pozycji w tym filtrze</Text>
+              <Text style={styles.emptySub}>
+                Nie masz zapisanych ogłoszeń w wybranej podkategorii.
+              </Text>
+            </View>
+          }
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
         />
@@ -119,7 +136,7 @@ export const SavedTab: React.FC<SavedTabProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'transparent',
   },
   subFilterRow: {
     flexDirection: 'row',
@@ -157,10 +174,15 @@ const styles = StyleSheet.create({
     paddingBottom: 110,
   },
   emptyContainer: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 36,
+    padding: 32,
+    margin: 16,
+    marginTop: 24,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    borderWidth: 1,
+    borderColor: 'rgba(209, 250, 229, 0.9)',
   },
   starCircle: {
     width: 80,

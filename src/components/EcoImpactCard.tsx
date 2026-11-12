@@ -1,15 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Share, StyleProp, ViewStyle } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { THEME, GRADIENTS, APP_FONT } from '../constants/categories';
+import { APP_FONT } from '../constants/categories';
 import { EcoStats } from '../services/storageCache';
 
 interface EcoImpactCardProps {
   stats: EcoStats;
   streakDays?: number;
   isDark?: boolean;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 }
 
 const WEEKDAYS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
@@ -48,7 +48,10 @@ export const EcoImpactCard: React.FC<EcoImpactCardProps> = ({
   isDark = false,
   style,
 }) => {
-  const { days: calendarDays, todayFormatted } = getCalendarWeekDays(streakDays);
+  const { days: calendarDays, todayFormatted } = React.useMemo(
+    () => getCalendarWeekDays(streakDays),
+    [streakDays]
+  );
   const getRank = (rescued: number) => {
     if (rescued >= 10) return { title: 'Bohater Zero-Waste', icon: 'shield-crown', color: '#10B981' };
     if (rescued >= 5) return { title: 'Mistrz Drugiego Życia', icon: 'medal', color: '#F59E0B' };

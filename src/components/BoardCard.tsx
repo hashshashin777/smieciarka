@@ -8,29 +8,29 @@ import { formatRelativeTime } from '../utils/helpers';
 
 interface BoardCardProps {
   post: BoardPost;
+  isLiked?: boolean;
   onLikeToggle?: (postId: string) => void;
   isSaved?: boolean;
   onToggleSave?: (postId: string) => void;
 }
 
-export const BoardCard: React.FC<BoardCardProps> = React.memo(({
+const BoardCardComponent: React.FC<BoardCardProps> = ({
   post,
+  isLiked,
   onLikeToggle,
   isSaved = false,
   onToggleSave,
 }) => {
-  const [liked, setLiked] = useState(false);
-  const [likes, setLikes] = useState(post.likesCount);
+  const [localLiked, setLocalLiked] = useState(false);
+  const isControlled = isLiked !== undefined;
+  const liked = isControlled ? isLiked : localLiked;
+  const likes = isControlled ? post.likesCount : post.likesCount + (localLiked ? 1 : 0);
 
   const tagMeta = BOARD_TAGS.find((t) => t.id === post.tag) || BOARD_TAGS[BOARD_TAGS.length - 1];
 
   const handleLike = () => {
-    if (liked) {
-      setLikes((prev) => prev - 1);
-      setLiked(false);
-    } else {
-      setLikes((prev) => prev + 1);
-      setLiked(true);
+    if (!isControlled) {
+      setLocalLiked((prev) => !prev);
     }
     if (onLikeToggle) {
       onLikeToggle(post.id);
@@ -43,14 +43,19 @@ export const BoardCard: React.FC<BoardCardProps> = React.memo(({
         title: `Tablica Śmieciarki: ${post.title}`,
         message: `Wpis z Tablicy Śmieciarki: „${post.title}” – ${post.content}\n\nDołącz do sąsiedzkiej tablicy: https://smieciarka.fun/board/${post.id}`,
       });
-    } catch (e) {}
+    } catch {
+      Alert.alert('Nie udało się udostępnić', 'Spróbuj ponownie za chwilę.');
+    }
   };
 
   const handleContact = () => {
     if (post.contactInfo) {
-      Alert.alert('Kontakt do ogłoszeniodawcy', `${post.authorName}:\n\n${post.contactInfo}`);
+      Alert.alert('Kontakt do sąsiada', `${post.authorName}:\n\n${post.contactInfo}`);
     } else {
-      Alert.alert('Ogłoszenie', `Autor: ${post.authorName}\n\nAby skontaktować się, dołącz do lokalnej grupy.`);
+      Alert.alert(
+        'Brak danych kontaktowych',
+        `Autor (${post.authorName}) nie podał numeru ani adresu e-mail przy tym wpisie. Możesz udostępnić wpis dalej lub zapisać go gwiazdką.`
+      );
     }
   };
 
@@ -127,6 +132,9 @@ export const BoardCard: React.FC<BoardCardProps> = React.memo(({
             style={[styles.likeBtn, liked && styles.likeBtnActive]}
             onPress={handleLike}
             activeOpacity={0.8}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={liked ? 'Cofnij wsparcie' : 'Wesprzyj wpis'}
           >
             <MaterialCommunityIcons
               name={liked ? 'heart' : 'heart-outline'}
@@ -174,7 +182,10 @@ export const BoardCard: React.FC<BoardCardProps> = React.memo(({
       </View>
     </View>
   );
-});
+};
+
+export const BoardCard = React.memo(BoardCardComponent);
+BoardCard.displayName = 'BoardCard';
 
 const styles = StyleSheet.create({
   card: {

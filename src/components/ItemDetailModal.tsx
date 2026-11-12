@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,12 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   Alert,
   Share,
+  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PostItem, UserProfile } from '../types';
 import { THEME, CATEGORIES, APP_FONT } from '../constants/categories';
@@ -21,11 +23,12 @@ interface ItemDetailModalProps {
   visible: boolean;
   onClose: () => void;
   userCoords?: { latitude: number; longitude: number } | null;
-  onVoteStillThere: (itemId: string) => void;
-  onVoteTaken: (itemId: string) => void;
+  onVoteStillThere: (itemId: string) => void | Promise<void>;
+  onVoteTaken: (itemId: string) => void | Promise<void>;
   isSaved?: boolean;
   onToggleSave?: () => void;
   currentUser?: UserProfile | null;
+  accountsEnabled?: boolean;
   onOpenChat?: () => void;
 }
 
@@ -39,9 +42,24 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   isSaved = false,
   onToggleSave,
   currentUser,
+  accountsEnabled = true,
   onOpenChat,
 }) => {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [isVoting, setIsVoting] = useState(false);
+  const [failedPhotos, setFailedPhotos] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!visible) return;
+    const interval = setInterval(() => {
+      setNowMs(Date.now());
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [visible]);
+
   if (!item) return null;
+
+  const windowWidth = Dimensions.get('window').width;
 
   const categoryMeta = CATEGORIES.find((c) => c.id === item.category) || CATEGORIES[CATEGORIES.length - 1];
   const isWystawka = item.type === 'wystawka';
@@ -57,12 +75,19 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     );
   };
 
-  const handleStillThere = () => {
-    onVoteStillThere(item.id);
-    Alert.alert('Dziękujemy!', 'Potwierdzono, że wystawka wciąż jest dostępna.');
+  const handleStillThere = async () => {
+    if (isVoting) return;
+    setIsVoting(true);
+    try {
+      await onVoteStillThere(item.id);
+      Alert.alert('Dziękujemy!', 'Potwierdzono, że wystawka wciąż jest dostępna.');
+    } finally {
+      setIsVoting(false);
+    }
   };
 
   const handleTaken = () => {
+    if (isVoting) return;
     Alert.alert(
       'Potwierdź zabranie',
       'Czy na pewno przedmiot został już zabrany?',
@@ -71,9 +96,15 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         {
           text: 'Tak, zabrane',
           style: 'destructive',
-          onPress: () => {
-            onVoteTaken(item.id);
-            onClose();
+          onPress: async () => {
+            if (isVoting) return;
+            setIsVoting(true);
+            try {
+              await onVoteTaken(item.id);
+              onClose();
+            } finally {
+              setIsVoting(false);
+            }
           },
         },
       ]
@@ -86,11 +117,22 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         title: `Śmieciarka: ${item.title}`,
         message: `Sprawdź to znalezisko na Śmieciarce: „${item.title}” w okolicy ${item.location.address || 'mapy'}! 🚛💚\n\nRatuj rzeczy przed śmietnikiem: https://smieciarka.fun/item/${item.id}`,
       });
-    } catch (e) {}
+    } catch {
+      Alert.alert('Nie udało się udostępnić', 'Spróbuj ponownie za chwilę.');
+    }
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onShow={() => {
+        setNowMs(Date.now());
+        setFailedPhotos({});
+      }}
+      onRequestClose={onClose}
+    >
       <SafeAreaView style={styles.safeArea}>
         {/* Top bar with close, share, and save buttons */}
         <View style={styles.topBar}>
@@ -136,7 +178,43 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           {/* Main Photo */}
           <View style={styles.imageWrapper}>
             {item.photos && item.photos.length > 0 ? (
-              <Image source={{ uri: item.photos[0] }} style={styles.photo} resizeMode="cover" />
+              item.photos.length === 1 ? (
+                failedPhotos[item.photos[0]] ? (
+                  <View style={styles.placeholderWrapper}>
+                    <MaterialCommunityIcons name="image-off-outline" size={48} color="#94A3B8" />
+                  </View>
+                ) : (
+                  <Image
+                    source={{ uri: item.photos[0] }}
+                    style={styles.photo}
+                    resizeMode="cover"
+                    onError={() =>
+                      setFailedPhotos((prev) => ({ ...prev, [item.photos[0]]: true }))
+                    }
+                  />
+                )
+              ) : (
+                <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
+                  {item.photos.map((uri, idx) =>
+                    failedPhotos[uri] ? (
+                      <View
+                        key={`${uri}-${idx}`}
+                        style={[styles.placeholderWrapper, { width: windowWidth }]}
+                      >
+                        <MaterialCommunityIcons name="image-off-outline" size={48} color="#94A3B8" />
+                      </View>
+                    ) : (
+                      <Image
+                        key={`${uri}-${idx}`}
+                        source={{ uri }}
+                        style={[styles.photo, { width: windowWidth }]}
+                        resizeMode="cover"
+                        onError={() => setFailedPhotos((prev) => ({ ...prev, [uri]: true }))}
+                      />
+                    )
+                  )}
+                </ScrollView>
+              )
             ) : (
               <View style={styles.placeholderWrapper}>
                 <MaterialCommunityIcons name="image-off-outline" size={48} color="#94A3B8" />
@@ -210,7 +288,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       const expiry = item.expiresAt
                         ? new Date(item.expiresAt).getTime()
                         : new Date(item.createdAt).getTime() + 6 * 60 * 60 * 1000;
-                      const diffMins = Math.max(0, Math.floor((expiry - Date.now()) / (60 * 1000)));
+                      const diffMins = Math.max(0, Math.floor((expiry - nowMs) / (60 * 1000)));
                       const h = Math.floor(diffMins / 60);
                       const m = diffMins % 60;
                       return `Ważność wystawki: ok. ${h}h ${m}min`;
@@ -221,12 +299,24 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   Wystawki uliczne są aktywne przez 6 godzin. Potwierdź obecność, aby przedłużyć widoczność o kolejne 2 godziny!
                 </Text>
                 <View style={styles.voteRow}>
-                  <TouchableOpacity style={styles.voteBtnGreen} onPress={handleStillThere}>
-                    <MaterialCommunityIcons name="thumb-up-outline" size={18} color="#FFFFFF" />
+                  <TouchableOpacity
+                    style={[styles.voteBtnGreen, isVoting && { opacity: 0.7 }]}
+                    onPress={handleStillThere}
+                    disabled={isVoting}
+                  >
+                    {isVoting ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <MaterialCommunityIcons name="thumb-up-outline" size={18} color="#FFFFFF" />
+                    )}
                     <Text style={styles.voteBtnText}>Jeszcze stoi ({item.stillThereVotes})</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={styles.voteBtnGray} onPress={handleTaken}>
+                  <TouchableOpacity
+                    style={[styles.voteBtnGray, isVoting && { opacity: 0.7 }]}
+                    onPress={handleTaken}
+                    disabled={isVoting}
+                  >
                     <MaterialCommunityIcons name="check" size={18} color="#DC2626" />
                     <Text style={[styles.voteBtnText, { color: '#DC2626' }]}>
                       {item.takenVotes === 1 ? 'Potwierdź brak (1/2)' : 'Już zabrane'}
@@ -261,7 +351,11 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   {item.type === 'wystawka' ? 'Zapytaj o wystawkę / Napisz' : 'Napisz wiadomość do oddającego'}
                 </Text>
                 <Text style={styles.chatActionSub}>
-                  {currentUser ? `Czat aktywny jako: ${currentUser.name}` : 'Wymaga konta (Apple, Google, Facebook)'}
+                  {!accountsEnabled
+                    ? 'Zadaj pytanie o przedmiot na czacie'
+                    : currentUser
+                    ? `Czat aktywny jako: ${currentUser.name}`
+                    : 'Wymaga konta (Apple, Google, Facebook)'}
                 </Text>
               </View>
               <MaterialCommunityIcons name="chevron-right" size={20} color="#059669" />

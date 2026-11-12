@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
+import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { THEME, APP_FONT } from '../constants/categories';
 
 interface BrandLogoProps {

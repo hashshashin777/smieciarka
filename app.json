@@ -28,19 +28,62 @@
       "permissions": [
         "CAMERA",
         "READ_MEDIA_IMAGES",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": true,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "smieciarka"
+            },
+            {
+              "scheme": "https",
+              "host": "smieciarka.fun",
+              "pathPrefix": "/item"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-secure-store",
+      "expo-localization",
+      "expo-status-bar",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Aplikacja Śmieciarka potrzebuje Twojej lokalizacji, aby pokazać wystawki w okolicy i zapisać miejsce znaleziska."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Aplikacja Śmieciarka potrzebuje dostępu do galerii, aby dodać zdjęcie przedmiotu.",
+          "cameraPermission": "Aplikacja Śmieciarka potrzebuje dostępu do aparatu, aby zrobić zdjęcie wystawki.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-keepattributes *Annotation*,Signature,InnerClasses\n-keep class com.airbnb.android.react.maps.** { *; }\n-keep class com.google.android.gms.maps.** { *; }"
+          }
+        }
+      ],
+      "./plugins/withAndroidQueries"
     ]
   }
 }

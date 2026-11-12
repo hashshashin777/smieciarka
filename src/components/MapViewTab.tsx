@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,22 +10,22 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PostItem } from '../types';
-import { THEME, CATEGORIES, APP_FONT } from '../constants/categories';
+import { THEME, APP_FONT } from '../constants/categories';
+import { CityOption, getCityDisplayLabel } from '../constants/cities';
 import { calculateDistance } from '../utils/helpers';
-import { DARK_MAP_STYLE } from '../constants/darkMapStyle';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Dynamically handle react-native-maps for native platforms
-let MapView: any = null;
-let Marker: any = null;
-let Callout: any = null;
+let MapView: React.ComponentType<any> | null = null;
+let Marker: React.ComponentType<any> | null = null;
 
 if (Platform.OS !== 'web') {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Maps = require('react-native-maps');
     MapView = Maps.default;
     Marker = Maps.Marker;
-    Callout = Maps.Callout;
-  } catch (e) {
+  } catch {
     // Maps not loaded
   }
 }
@@ -43,6 +43,9 @@ interface MapViewTabProps {
   themeMode?: ThemeMode;
   onThemeModeChange?: (mode: ThemeMode) => void;
   isDark?: boolean;
+  selectedCity?: CityOption | null;
+  gpsCityName?: string | null;
+  onOpenCityPicker?: () => void;
 }
 
 export const MapViewTab: React.FC<MapViewTabProps> = ({
@@ -53,20 +56,53 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
   onOpenDetail,
   onRecenterGPS,
   usersCount = 128,
-  themeMode = 'auto',
-  onThemeModeChange,
   isDark = false,
+  selectedCity = null,
+  gpsCityName = null,
+  onOpenCityPicker,
 }) => {
+  const insets = useSafeAreaInsets();
   const mapRef = useRef<any>(null);
+  const prevCityIdRef = useRef<string | null | undefined>(undefined);
+  const hasCenteredGpsRef = useRef<boolean>(Boolean(selectedCity || userCoords));
 
   const defaultRegion = {
-    latitude: userCoords?.latitude || 51.2465,
-    longitude: userCoords?.longitude || 22.5684,
-    latitudeDelta: 0.04,
-    longitudeDelta: 0.04,
+    latitude: selectedCity?.latitude || userCoords?.latitude || 51.2465,
+    longitude: selectedCity?.longitude || userCoords?.longitude || 22.5684,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
   };
 
   const [region, setRegion] = React.useState(defaultRegion);
+
+  useEffect(() => {
+    const currentCityKey = selectedCity ? `${selectedCity.id}:${selectedCity.latitude}:${selectedCity.longitude}` : '__gps__';
+    if (prevCityIdRef.current === undefined) {
+      prevCityIdRef.current = currentCityKey;
+      return;
+    }
+
+    const gpsJustArrived = !selectedCity && userCoords && !hasCenteredGpsRef.current;
+    if (prevCityIdRef.current !== currentCityKey || gpsJustArrived) {
+      prevCityIdRef.current = currentCityKey;
+      if (gpsJustArrived) {
+        hasCenteredGpsRef.current = true;
+      }
+      const targetLat = selectedCity?.latitude ?? userCoords?.latitude;
+      const targetLng = selectedCity?.longitude ?? userCoords?.longitude;
+      if (mapRef.current && targetLat !== undefined && targetLng !== undefined) {
+        mapRef.current.animateToRegion(
+          {
+            latitude: targetLat,
+            longitude: targetLng,
+            latitudeDelta: 0.06,
+            longitudeDelta: 0.06,
+          },
+          550
+        );
+      }
+    }
+  }, [selectedCity, userCoords]);
 
   // Klastrowanie przestrzenne (Spatial Grid Clustering) zależne od zoomu mapy
   const clusters = React.useMemo(() => {
@@ -124,7 +160,7 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
   };
 
   const handleCenter = () => {
-    if (mapRef.current && userCoords) {
+    if (!selectedCity && mapRef.current && userCoords) {
       mapRef.current.animateToRegion({
         latitude: userCoords.latitude,
         longitude: userCoords.longitude,
@@ -135,9 +171,26 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
     onRecenterGPS();
   };
 
-  if (Platform.OS === 'web' || !MapView) {
+  if (Platform.OS === 'web' || !MapView || !Marker) {
     return (
       <View style={styles.webFallbackContainer}>
+        {onOpenCityPicker && (
+          <TouchableOpacity
+            style={styles.webCityPill}
+            onPress={onOpenCityPicker}
+            activeOpacity={0.85}
+          >
+            <MaterialCommunityIcons
+              name={selectedCity ? 'city-variant-outline' : 'crosshairs-gps'}
+              size={18}
+              color="#059669"
+            />
+            <Text style={styles.cityFabText}>
+              {getCityDisplayLabel(selectedCity, gpsCityName)}
+            </Text>
+            <MaterialCommunityIcons name="chevron-down" size={18} color="#047857" />
+          </TouchableOpacity>
+        )}
         <MaterialCommunityIcons name="map-legend" size={54} color={THEME.primary} />
         <Text style={styles.fallbackTitle}>Mapa wystawek i znalezisk</Text>
         <Text style={styles.fallbackDesc}>
@@ -175,9 +228,12 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
     );
   }
 
+  const ActiveMapView = MapView;
+  const ActiveMapMarker = Marker;
+
   return (
     <View style={[styles.container, isDark && styles.containerDark]}>
-      <MapView
+      <ActiveMapView
         ref={mapRef}
         style={styles.map}
         initialRegion={defaultRegion}
@@ -190,7 +246,7 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
         {clusters.map((cluster) => {
           if (cluster.isCluster) {
             return (
-              <Marker
+              <ActiveMapMarker
                 key={cluster.id}
                 coordinate={{
                   latitude: cluster.latitude,
@@ -203,14 +259,14 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
                   <MaterialCommunityIcons name="layers-triple-outline" size={13} color="#FFFFFF" />
                   <Text style={styles.clusterText}>{cluster.count}</Text>
                 </View>
-              </Marker>
+              </ActiveMapMarker>
             );
           }
 
           const item = cluster.items[0];
           const isWystawka = item.type === 'wystawka';
           return (
-            <Marker
+            <ActiveMapMarker
               key={item.id}
               coordinate={{
                 latitude: item.location.latitude,
@@ -232,10 +288,10 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
                   color="#FFFFFF"
                 />
               </View>
-            </Marker>
+            </ActiveMapMarker>
           );
         })}
-      </MapView>
+      </ActiveMapView>
 
       {/* Informacja o braku ogłoszeń na mapie (Cold Start) */}
       {items.length === 0 && (
@@ -252,6 +308,29 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
         </View>
       )}
 
+      {/* Floating City Picker pill (top-left) */}
+      {onOpenCityPicker && (
+        <TouchableOpacity
+          style={styles.cityFab}
+          onPress={onOpenCityPicker}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={`Wybrane miasto na mapie: ${getCityDisplayLabel(selectedCity, gpsCityName)}. Dotknij, aby zmienić.`}
+        >
+          <View style={styles.cityFabIconCircle}>
+            <MaterialCommunityIcons
+              name={selectedCity ? 'city-variant-outline' : 'crosshairs-gps'}
+              size={16}
+              color="#059669"
+            />
+          </View>
+          <Text style={styles.cityFabText} numberOfLines={1}>
+            {getCityDisplayLabel(selectedCity, gpsCityName)}
+          </Text>
+          <MaterialCommunityIcons name="chevron-down" size={18} color="#475569" />
+        </TouchableOpacity>
+      )}
+
       {/* Floating GPS recenter button */}
       <TouchableOpacity
         style={[styles.gpsFab, isDark && styles.gpsFabDark]}
@@ -263,7 +342,7 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
 
       {/* Selected Item Preview Card at the bottom of the map */}
       {selectedItem && (
-        <View style={styles.previewCardContainer}>
+        <View style={[styles.previewCardContainer, { bottom: 128 + Math.max(0, insets.bottom - 12) }]}>
           <TouchableOpacity
             style={[styles.previewCard, isDark && styles.previewCardDark]}
             onPress={() => onOpenDetail(selectedItem)}
@@ -323,7 +402,7 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
       <TouchableOpacity
         style={[
           styles.floatingCommunityBadge,
-          selectedItem ? styles.floatingCommunityBadgeWithPreview : null,
+          { bottom: (selectedItem ? 220 : 96) + Math.max(0, insets.bottom - 12) },
         ]}
         activeOpacity={0.85}
         onPress={() =>
@@ -465,6 +544,64 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
+  cityFab: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    right: 72,
+    alignSelf: 'flex-start',
+    maxWidth: 250,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 7,
+    paddingRight: 12,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.16,
+    shadowRadius: 6,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    zIndex: 25,
+  },
+  cityFabIconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  cityFabText: {
+    flexShrink: 1,
+    fontFamily: APP_FONT,
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  webCityPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 2,
+  },
   gpsFab: {
     position: 'absolute',
     top: 16,
@@ -569,7 +706,7 @@ const styles = StyleSheet.create({
   },
   webFallbackContainer: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     padding: 24,
   },
@@ -651,7 +788,7 @@ const styles = StyleSheet.create({
   },
   emptyMapNotice: {
     position: 'absolute',
-    top: 70,
+    top: 72,
     left: 16,
     right: 16,
     flexDirection: 'row',

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   TextInput,
   KeyboardAvoidingView,
@@ -13,6 +12,8 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { safeOpenUrl } from '../utils/helpers';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
@@ -80,40 +81,32 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
   };
 
   const handleSocialLogin = async (provider: AuthProvider) => {
+    if (provider !== 'google') {
+      Alert.alert(
+        'Dostępne wkrótce',
+        `Logowanie przez ${provider.toUpperCase()} nie jest jeszcze włączone. Użyj konta Google lub e-maila.`
+      );
+      return;
+    }
+
     setIsLoading(true);
     try {
-      if (provider === 'google') {
-        const res = await AuthService.signInWithGoogle();
-        setIsLoading(false);
-        if (res.success && res.user) {
-          if (onLoginSuccess) {
-            onLoginSuccess(res.user);
-          } else {
-            onLoginProvider('google', res.user.name, res.user.email);
-          }
-          onClose();
-          Alert.alert(
-            'Witaj w Śmieciarce! 👋',
-            `Pomyślnie połączono przez konto Google (${res.user.name}).\nMożesz teraz pisać i odbierać wiadomości od sąsiadów!`
-          );
-        } else if (res.error) {
-          Alert.alert('Logowanie Google', res.error);
-        }
-        return;
-      }
-
-      const user = await AuthService.signInWithProvider(provider);
+      const res = await AuthService.signInWithGoogle();
       setIsLoading(false);
-      if (onLoginSuccess) {
-        onLoginSuccess(user);
-      } else {
-        onLoginProvider(provider);
+      if (res.success && res.user) {
+        if (onLoginSuccess) {
+          onLoginSuccess(res.user);
+        } else {
+          onLoginProvider('google', res.user.name, res.user.email);
+        }
+        onClose();
+        Alert.alert(
+          'Witaj w Śmieciarce! 👋',
+          `Pomyślnie połączono przez konto Google (${res.user.name}).\nMożesz teraz pisać i odbierać wiadomości od sąsiadów!`
+        );
+      } else if (res.error) {
+        Alert.alert('Logowanie Google', res.error);
       }
-      onClose();
-      Alert.alert(
-        'Witaj w Śmieciarce! 👋',
-        `Pomyślnie połączono przez konto ${provider.toUpperCase()}.\nMożesz teraz pisać i odbierać wiadomości od sąsiadów!`
-      );
     } catch {
       setIsLoading(false);
       Alert.alert('Błąd logowania', 'Nie udało się połączyć konta. Spróbuj ponownie.');
@@ -193,13 +186,23 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
     }
   };
 
-  const handleForgotPassword = () => {
-    Alert.alert(
-      'Reset hasła 🔑',
-      email.trim()
-        ? `Link do zresetowania hasła zostałby wysłany na adres: ${email.trim()}.\n\n(Dla kont demonstracyjnych możesz użyć hasła: haslo123 lub utworzyć nowe konto w zakładce Rejestracja).`
-        : 'Wpisz swój adres e-mail w polu powyżej, a prześlemy instrukcję resetu hasła.'
-    );
+  const handleForgotPassword = async () => {
+    const clean = email.trim();
+    if (!clean) {
+      Alert.alert('Reset hasła 🔑', 'Wpisz najpierw swój adres e-mail w polu powyżej.');
+      return;
+    }
+    setIsLoading(true);
+    const res = await AuthService.resetPassword(clean);
+    setIsLoading(false);
+    if (res.ok) {
+      Alert.alert(
+        'Sprawdź skrzynkę 📬',
+        `Jeśli konto dla ${clean} istnieje, wysłaliśmy instrukcję zresetowania hasła.`
+      );
+    } else {
+      Alert.alert('Reset hasła', res.error || 'Nie udało się wysłać wiadomości resetującej.');
+    }
   };
 
   return (
@@ -225,7 +228,7 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
         </View>
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
         >
           <ScrollView
@@ -258,19 +261,6 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
 
             {/* Szybka rejestracja / logowanie społecznościowe */}
             <View style={styles.socialButtonsContainer}>
-              {/* Apple */}
-              <TouchableOpacity
-                style={styles.appleBtn}
-                onPress={() => handleSocialLogin('apple')}
-                activeOpacity={0.85}
-                disabled={isLoading}
-                accessibilityRole="button"
-                accessibilityLabel="Zarejestruj się przez Apple"
-              >
-                <MaterialCommunityIcons name="apple" size={22} color="#FFFFFF" style={styles.btnIcon} />
-                <Text style={styles.appleBtnText}>Kontynuuj z Apple</Text>
-              </TouchableOpacity>
-
               {/* Google */}
               <TouchableOpacity
                 style={styles.googleBtn}
@@ -282,19 +272,6 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
               >
                 <GoogleLogoIcon size={20} />
                 <Text style={styles.googleBtnText}>Kontynuuj z Google</Text>
-              </TouchableOpacity>
-
-              {/* Facebook */}
-              <TouchableOpacity
-                style={styles.facebookBtn}
-                onPress={() => handleSocialLogin('facebook')}
-                activeOpacity={0.85}
-                disabled={isLoading}
-                accessibilityRole="button"
-                accessibilityLabel="Zarejestruj się przez Facebook"
-              >
-                <MaterialCommunityIcons name="facebook" size={22} color="#FFFFFF" style={styles.btnIcon} />
-                <Text style={styles.facebookBtnText}>Kontynuuj z Facebook</Text>
               </TouchableOpacity>
             </View>
 
@@ -497,10 +474,58 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
               <MaterialCommunityIcons name="chevron-right" size={22} color="#10B981" />
             </TouchableOpacity>
 
-            {/* Stopka informacyjna */}
+            {/* Stopka informacyjna i linki prawne */}
             <Text style={styles.footerNote}>
               🛡️ Szanujemy Twoją prywatność. Dodawanie znalezisk nie wymaga logowania.
             </Text>
+
+            <View style={styles.legalLinksRow}>
+              <TouchableOpacity
+                onPress={() =>
+                  void safeOpenUrl(
+                    process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL || 'https://smieciarka.fun/privacy'
+                  )
+                }
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.legalLinkText}>Polityka prywatności</Text>
+              </TouchableOpacity>
+              <Text style={styles.legalDot}>•</Text>
+              <TouchableOpacity
+                onPress={() =>
+                  void safeOpenUrl(
+                    process.env.EXPO_PUBLIC_TERMS_URL || 'https://smieciarka.fun/terms'
+                  )
+                }
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.legalLinkText}>Regulamin</Text>
+              </TouchableOpacity>
+              <Text style={styles.legalDot}>•</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  Alert.alert(
+                    'Usuń lokalne dane',
+                    'Spowoduje to wylogowanie oraz wyczyszczenie zapisanej historii czatów, filtrów i danych profilu z tego urządzenia.',
+                    [
+                      { text: 'Anuluj', style: 'cancel' },
+                      {
+                        text: 'Usuń dane',
+                        style: 'destructive',
+                        onPress: async () => {
+                          await AuthService.deleteAccountAndLocalData();
+                          Alert.alert('Wyczyszczono', 'Lokalne dane konta zostały usunięte.');
+                          onContinueAsGuest();
+                        },
+                      },
+                    ]
+                  );
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.legalDangerText}>Usuń dane</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -621,23 +646,6 @@ const styles = StyleSheet.create({
   btnIcon: {
     marginRight: 10,
   },
-  appleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#000000',
-    borderRadius: 14,
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  appleBtnText: {
-    fontFamily: APP_FONT,
-    fontSize: 14.5,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
   googleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -652,21 +660,6 @@ const styles = StyleSheet.create({
     fontSize: 14.5,
     fontWeight: '700',
     color: '#1F2937',
-  },
-  facebookBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1877F2',
-    borderRadius: 14,
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-  },
-  facebookBtnText: {
-    fontFamily: APP_FONT,
-    fontSize: 14.5,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
   dividerRow: {
     flexDirection: 'row',
@@ -837,5 +830,30 @@ const styles = StyleSheet.create({
     marginTop: 20,
     lineHeight: 16,
     paddingHorizontal: 12,
+  },
+  legalLinksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+    paddingBottom: 16,
+  },
+  legalLinkText: {
+    fontFamily: APP_FONT,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#34D399',
+  },
+  legalDot: {
+    fontSize: 12,
+    color: '#475569',
+  },
+  legalDangerText: {
+    fontFamily: APP_FONT,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#F87171',
   },
 });

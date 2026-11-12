@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   View,
   FlatList,
   TouchableOpacity,
   Text,
-  SafeAreaView,
   Alert,
   Image,
   Modal,
@@ -13,15 +12,22 @@ import {
   Platform,
   LayoutAnimation,
   UIManager,
-  Linking,
+  RefreshControl,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 
-import { PostItem, ItemType, BoardPost } from './src/types';
+import {
+  PostItem,
+  ItemType,
+  BoardPost,
+  UserProfile,
+  AuthProvider,
+  SyncAction,
+} from './src/types';
 import { INITIAL_ITEMS } from './src/mock/items';
 import { INITIAL_BOARD_POSTS } from './src/mock/boardPosts';
 import { THEME, APP_FONT } from './src/constants/categories';
@@ -35,26 +41,44 @@ import { AddItemModal } from './src/components/AddItemModal';
 import { AddBoardPostModal } from './src/components/AddBoardPostModal';
 import { ItemDetailModal } from './src/components/ItemDetailModal';
 import { NeighborhoodModal } from './src/components/NeighborhoodModal';
+import { CityPickerModal } from './src/components/CityPickerModal';
+import { SpotlightBackground } from './src/components/SpotlightBackground';
 import { LoginScreenModal } from './src/components/LoginScreenModal';
 import { ItemChatModal } from './src/components/ItemChatModal';
+import { AdminPanelModal } from './src/components/AdminPanelModal';
+import { CityOption } from './src/constants/cities';
+import { BannerSlotId } from './src/constants/banners';
 import { calculateDistance } from './src/utils/helpers';
-import { UserProfile, AuthProvider } from './src/types';
 import { AuthService } from './src/services/authService';
+import { BoardRepository, CloudBoardRow, mapCloudRowToBoardPost } from './src/services/boardRepository';
+import { useAndroidBackHandler } from './src/hooks/useAndroidBackHandler';
+import { useDeepLinks } from './src/hooks/useDeepLinks';
+import { STRINGS_PL } from './src/i18n/pl';
 import { TutorialTooltip } from './src/components/TutorialTooltip';
 import { TUTORIAL_STEPS } from './src/constants/tutorialSteps';
 import {
   StorageCache,
   EcoStats,
   NeighborhoodSettings,
+  AdminSettings,
+  DEFAULT_ADMIN_SETTINGS,
   clampNeighborhoodRadius,
   getNeighborhoodLabel,
   isDistanceInNeighborhood,
 } from './src/services/storageCache';
 import {
+  CloudItemRow,
+  mapCloudRowToPostItem,
   fetchItemsFromCloud,
   insertItemToCloud,
   voteStillThereInCloud,
   voteTakenInCloud,
+  restoreItemInCloud,
+  archiveItemInCloud,
+  deleteItemFromCloud,
+  resetItemFlagsInCloud,
+  updateItemInCloud,
+  isSupabaseConfigured,
   supabase,
 } from './src/services/supabase';
 
@@ -115,16 +139,25 @@ export default function App() {
   const [boardPosts, setBoardPosts] = useState<BoardPost[]>(INITIAL_BOARD_POSTS);
   const [savedItemIds, setSavedItemIds] = useState<string[]>(['post-1']);
   const [savedBoardPostIds, setSavedBoardPostIds] = useState<string[]>(['board-1']);
+  const [likedBoardPostIds, setLikedBoardPostIds] = useState<string[]>([]);
+  const [isCloudRefreshing, setIsCloudRefreshing] = useState(false);
+  const [cloudLoadError, setCloudLoadError] = useState<string | null>(null);
+  const [pendingDeepLinkItemId, setPendingDeepLinkItemId] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<'all' | ItemType>('all');
   const [viewMode, setViewMode] = useState<'home' | 'map' | 'list' | 'board' | 'saved'>('home');
   const [searchQuery, setSearchQuery] = useState('');
-  const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>({
+  const [gpsCoords, setGpsCoords] = useState<{ latitude: number; longitude: number } | null>({
     latitude: 51.2465,
     longitude: 22.5684,
   });
+  const [gpsCityName, setGpsCityName] = useState<string | null>(null);
+  const [selectedCity, setSelectedCity] = useState<CityOption | null>(null);
+  const [isCityModalVisible, setIsCityModalVisible] = useState(false);
+
+  const userCoords = selectedCity
+    ? { latitude: selectedCity.latitude, longitude: selectedCity.longitude }
+    : gpsCoords;
   const [showBetaNotice, setShowBetaNotice] = useState(true);
-  const [themeMode, setThemeMode] = useState<'light'>('light');
-  const [isAddTooltipVisible, setIsAddTooltipVisible] = useState(true);
   const [isBoardTooltipDismissed, setIsBoardTooltipDismissed] = useState(false);
   const [tutorialStepIndex, setTutorialStepIndex] = useState<number | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
@@ -150,7 +183,9 @@ export default function App() {
   });
   const [isNeighborhoodModalVisible, setIsNeighborhoodModalVisible] = useState(false);
 
-  // Autoryzacja i konta (Apple, Google, Facebook) + Tryb Gość
+  // Autoryzacja i konta (Apple, Google, Facebook) + Tryb Gość + Panel Admina
+  const [adminSettings, setAdminSettings] = useState<AdminSettings>(DEFAULT_ADMIN_SETTINGS);
+  const [isAdminModalVisible, setIsAdminModalVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isLoginModalVisible, setIsLoginModalVisible] = useState(false);
   const [isChatModalVisible, setIsChatModalVisible] = useState(false);
@@ -159,6 +194,8 @@ export default function App() {
   const checkAuthAfterSplash = async () => {
     setShowWelcome(false);
     try {
+      const aSettings = await StorageCache.getAdminSettings();
+      if (!aSettings.accountsEnabled) return;
       const profile = await AuthService.getUserProfile();
       const isGuest = await AuthService.isGuestMode();
       if (!profile && !isGuest) {
@@ -177,21 +214,223 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Aplikacja działa wyłącznie w trybie Light Mode
-  const isDark = false;
+  // Okresowy znacznik czasu do czystego sprawdzania wygaśnięcia wystawek (6h TTL)
+  const [nowTimestamp, setNowTimestamp] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNowTimestamp(Date.now());
+    }, 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Modals state
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isAddBoardModalVisible, setIsAddBoardModalVisible] = useState(false);
   const [detailItem, setDetailItem] = useState<PostItem | null>(null);
   const [selectedMapItem, setSelectedMapItem] = useState<PostItem | null>(null);
+  const itemsRef = useRef<PostItem[]>(items);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  const flushPendingSyncQueue = useCallback(async () => {
+    if (!isSupabaseConfigured) return;
+    const queue = await StorageCache.getPendingSyncQueue();
+    if (queue.length === 0) return;
+
+    const voterKey = await StorageCache.getVoterKey();
+    const remaining: SyncAction[] = [];
+
+    for (const action of queue) {
+      let shouldRetryLater = false;
+      try {
+        if (action.kind === 'insert_item') {
+          const res = await insertItemToCloud(action.payload);
+          shouldRetryLater = !res.ok && res.error.code === 'NETWORK';
+        } else if (action.kind === 'vote_still_there') {
+          const res = await voteStillThereInCloud(action.itemId, voterKey);
+          shouldRetryLater = !res.ok && res.error.code === 'NETWORK';
+        } else if (action.kind === 'vote_taken') {
+          const res = await voteTakenInCloud(action.itemId, voterKey);
+          shouldRetryLater = !res.ok && res.error.code === 'NETWORK';
+        } else if (action.kind === 'insert_board_post') {
+          const res = await BoardRepository.insert(action.payload);
+          shouldRetryLater = !res.ok && res.error.code === 'NETWORK';
+        } else if (action.kind === 'toggle_board_like') {
+          const res = await BoardRepository.toggleLike(action.postId, voterKey);
+          shouldRetryLater = !res.ok && res.error.code === 'NETWORK';
+        }
+      } catch {
+        shouldRetryLater = true;
+      }
+
+      if (shouldRetryLater) {
+        remaining.push(action);
+      }
+    }
+
+    await StorageCache.replacePendingSyncQueue(remaining);
+  }, []);
+
+  const syncFromCloud = useCallback(async () => {
+    if (!isSupabaseConfigured) {
+      setCloudLoadError(null);
+      return;
+    }
+
+    await flushPendingSyncQueue();
+
+    const [itemsRes, boardRes] = await Promise.all([
+      fetchItemsFromCloud(),
+      BoardRepository.fetchAll(),
+    ]);
+
+    if (itemsRes.ok) {
+      setCloudLoadError(null);
+      if (itemsRes.data.length > 0) {
+        setItems(itemsRes.data);
+        StorageCache.saveCachedItems(itemsRes.data);
+      }
+    } else if (itemsRes.error.code === 'NETWORK') {
+      setCloudLoadError(itemsRes.error.message);
+    }
+
+    if (boardRes.ok && boardRes.data.length > 0) {
+      setBoardPosts(boardRes.data);
+      StorageCache.saveCachedBoardPosts(boardRes.data);
+    }
+  }, [flushPendingSyncQueue]);
+
+  const handleRefreshCloud = useCallback(async () => {
+    setIsCloudRefreshing(true);
+    try {
+      await syncFromCloud();
+    } finally {
+      setIsCloudRefreshing(false);
+    }
+  }, [syncFromCloud]);
+
+  const handleOpenItemById = useCallback((itemId: string) => {
+    const found = itemsRef.current.find((it) => it.id === itemId);
+    if (found) {
+      setDetailItem(found);
+      setViewMode('list');
+    } else {
+      setPendingDeepLinkItemId(itemId);
+    }
+  }, []);
+
+  useDeepLinks(handleOpenItemById);
+
+  useEffect(() => {
+    if (!pendingDeepLinkItemId) return;
+    const found = items.find((it) => it.id === pendingDeepLinkItemId);
+    if (found) {
+      setDetailItem(found);
+      setViewMode('list');
+      setPendingDeepLinkItemId(null);
+    }
+  }, [items, pendingDeepLinkItemId]);
+
+  const handleHardwareBack = useCallback((): boolean => {
+    if (showWelcome) {
+      setShowWelcome(false);
+      return true;
+    }
+    if (isAdminModalVisible) {
+      setIsAdminModalVisible(false);
+      return true;
+    }
+    if (isChatModalVisible) {
+      setIsChatModalVisible(false);
+      return true;
+    }
+    if (isLoginModalVisible) {
+      setIsLoginModalVisible(false);
+      return true;
+    }
+    if (isCityModalVisible) {
+      setIsCityModalVisible(false);
+      return true;
+    }
+    if (isNeighborhoodModalVisible) {
+      setIsNeighborhoodModalVisible(false);
+      return true;
+    }
+    if (isAddModalVisible) {
+      setIsAddModalVisible(false);
+      return true;
+    }
+    if (isAddBoardModalVisible) {
+      setIsAddBoardModalVisible(false);
+      return true;
+    }
+    if (detailItem) {
+      setDetailItem(null);
+      return true;
+    }
+    if (viewMode !== 'home') {
+      setViewMode('home');
+      return true;
+    }
+    return false;
+  }, [
+    showWelcome,
+    isAdminModalVisible,
+    isChatModalVisible,
+    isLoginModalVisible,
+    isCityModalVisible,
+    isNeighborhoodModalVisible,
+    isAddModalVisible,
+    isAddBoardModalVisible,
+    detailItem,
+    viewMode,
+  ]);
+
+  useAndroidBackHandler(handleHardwareBack);
 
   // Request GPS, load offline cache and fetch cloud data on startup
   useEffect(() => {
+    let isMounted = true;
+
     (async () => {
-      // 0. Ładowanie pamięci podręcznej (Offline Cache - Moduł C)
+      // 0. Ładowanie pamięci podręcznej (Offline Cache + migracja schematu)
       try {
-        const cached = await StorageCache.getCachedItems();
+        await StorageCache.ensureSchemaVersion();
+
+        const [
+          cached,
+          cachedBoard,
+          cachedSaved,
+          cachedSavedBoard,
+          cachedLikedBoard,
+        ] = await Promise.all([
+          StorageCache.getCachedItems(),
+          StorageCache.getCachedBoardPosts(),
+          StorageCache.getSavedIds(),
+          StorageCache.getSavedBoardPostIds(),
+          StorageCache.getLikedBoardPostIds(),
+        ]);
+
+        const [
+          nSettings,
+          savedCity,
+          stats,
+          activeStreak,
+          aSettings,
+          tutorialDone,
+        ] = await Promise.all([
+          StorageCache.getNeighborhoodSettings(),
+          StorageCache.getSelectedCity(),
+          StorageCache.getEcoStats(),
+          StorageCache.recordDailyActivity(),
+          StorageCache.getAdminSettings(),
+          StorageCache.isTutorialCompleted(),
+        ]);
+
+        if (!isMounted) return;
+
         if (cached && cached.length > 0) {
           const cachedIds = new Set(cached.map((c) => c.id));
           const newInitials = INITIAL_ITEMS.filter((it) => !cachedIds.has(it.id));
@@ -202,25 +441,45 @@ export default function App() {
           setItems(INITIAL_ITEMS);
           StorageCache.saveCachedItems(INITIAL_ITEMS);
         }
-        const cachedSaved = await StorageCache.getSavedIds();
-        if (cachedSaved && cachedSaved.length > 0) {
+
+        if (cachedBoard && cachedBoard.length > 0) {
+          const cachedBoardIds = new Set(cachedBoard.map((p) => p.id));
+          const newInitialPosts = INITIAL_BOARD_POSTS.filter((p) => !cachedBoardIds.has(p.id));
+          const combinedBoard = [...newInitialPosts, ...cachedBoard];
+          setBoardPosts(combinedBoard);
+          StorageCache.saveCachedBoardPosts(combinedBoard);
+        } else {
+          setBoardPosts(INITIAL_BOARD_POSTS);
+          StorageCache.saveCachedBoardPosts(INITIAL_BOARD_POSTS);
+        }
+
+        if (cachedSaved.length > 0) {
           setSavedItemIds(cachedSaved);
         }
-        const nSettings = await StorageCache.getNeighborhoodSettings();
-        setNeighborhoodSettings(nSettings);
-        const stats = await StorageCache.getEcoStats();
-        setEcoStats(stats);
-        const activeStreak = await StorageCache.recordDailyActivity();
-        setStreakDays(activeStreak);
-        const profile = await AuthService.getUserProfile();
-        if (profile) {
-          setCurrentUser(profile);
+        if (cachedSavedBoard.length > 0) {
+          setSavedBoardPostIds(cachedSavedBoard);
         }
-        const tutorialDone = await StorageCache.isTutorialCompleted();
-        if (!tutorialDone) {
+        if (cachedLikedBoard.length > 0) {
+          setLikedBoardPostIds(cachedLikedBoard);
+        }
+
+        setNeighborhoodSettings(nSettings);
+        if (savedCity) setSelectedCity(savedCity);
+        setEcoStats(stats);
+        setStreakDays(activeStreak);
+        setAdminSettings(aSettings);
+        setShowBetaNotice(aSettings.bannerEnabled);
+
+        if (aSettings.accountsEnabled) {
+          const profile = await AuthService.getUserProfile();
+          if (isMounted && profile) {
+            setCurrentUser(profile);
+          }
+        }
+        if (!tutorialDone && isMounted) {
           setTutorialStepIndex(0);
         }
-      } catch (cacheErr) {
+      } catch {
         // Pomijamy błąd cache
       }
 
@@ -229,69 +488,143 @@ export default function App() {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
           const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          setUserCoords({
+          const nextGps = {
             latitude: loc.coords.latitude,
             longitude: loc.coords.longitude,
-          });
+          };
+          if (!isMounted) return;
+          setGpsCoords(nextGps);
+          if (Platform.OS !== 'web') {
+            try {
+              const reverse = await Location.reverseGeocodeAsync(nextGps);
+              if (reverse.length > 0 && isMounted) {
+                const detectedCity = reverse[0].city || reverse[0].subregion || null;
+                if (detectedCity) setGpsCityName(detectedCity);
+              }
+            } catch {
+              // Ignorujemy błąd reverse geocodingu
+            }
+          }
         }
-      } catch (err) {
-        setUserCoords({ latitude: 51.2465, longitude: 22.5684 }); // Domyślnie Centrum Lublina
+      } catch {
+        if (isMounted) {
+          setGpsCoords({ latitude: 51.2465, longitude: 22.5684 });
+        }
       }
 
-      // 2. Pobieranie świeżych ogłoszeń z chmury Supabase
-      try {
-        const cloudItems = await fetchItemsFromCloud();
-        if (cloudItems && cloudItems.length > 0) {
-          setItems(cloudItems);
-          StorageCache.saveCachedItems(cloudItems);
-        }
-      } catch (e) {
-        console.log('Używam danych z pamięci podręcznej');
+      // 2. Pobieranie świeżych ogłoszeń i tablicy z chmury Supabase
+      if (isMounted) {
+        await syncFromCloud();
       }
     })();
 
-    // 3. Nasłuchiwanie na żywo (Realtime) z bazy Supabase
+    // 3. Nasłuchiwanie przyrostowe (Realtime) dla ogłoszeń i tablicy
     if (supabase) {
       const channel = supabase
-        .channel('public:items')
+        .channel('public:smieciarka-feed')
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'items' },
-          async () => {
-            const updated = await fetchItemsFromCloud();
-            if (updated && updated.length > 0) {
-              setItems(updated);
-              StorageCache.saveCachedItems(updated);
+          (payload) => {
+            if (payload.eventType === 'INSERT' && payload.new) {
+              const inserted = mapCloudRowToPostItem(payload.new as CloudItemRow);
+              setItems((prev) => {
+                if (prev.some((it) => it.id === inserted.id)) return prev;
+                const next = [inserted, ...prev];
+                StorageCache.saveCachedItems(next);
+                return next;
+              });
+            } else if (payload.eventType === 'UPDATE' && payload.new) {
+              const updatedItem = mapCloudRowToPostItem(payload.new as CloudItemRow);
+              setItems((prev) => {
+                const next = prev.map((it) => (it.id === updatedItem.id ? updatedItem : it));
+                StorageCache.saveCachedItems(next);
+                return next;
+              });
+              setDetailItem((prev) => (prev?.id === updatedItem.id ? updatedItem : prev));
+            } else if (payload.eventType === 'DELETE' && payload.old) {
+              const deletedId = (payload.old as { id?: string }).id;
+              if (!deletedId) return;
+              setItems((prev) => {
+                const next = prev.filter((it) => it.id !== deletedId);
+                StorageCache.saveCachedItems(next);
+                return next;
+              });
+              setDetailItem((prev) => (prev?.id === deletedId ? null : prev));
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'board_posts' },
+          (payload) => {
+            if (payload.eventType === 'INSERT' && payload.new) {
+              const insertedPost = mapCloudRowToBoardPost(payload.new as CloudBoardRow);
+              setBoardPosts((prev) => {
+                if (prev.some((p) => p.id === insertedPost.id)) return prev;
+                const next = [insertedPost, ...prev];
+                StorageCache.saveCachedBoardPosts(next);
+                return next;
+              });
+            } else if (payload.eventType === 'UPDATE' && payload.new) {
+              const updatedPost = mapCloudRowToBoardPost(payload.new as CloudBoardRow);
+              setBoardPosts((prev) => {
+                const next = prev.map((p) => (p.id === updatedPost.id ? updatedPost : p));
+                StorageCache.saveCachedBoardPosts(next);
+                return next;
+              });
+            } else if (payload.eventType === 'DELETE' && payload.old) {
+              const deletedId = (payload.old as { id?: string }).id;
+              if (!deletedId) return;
+              setBoardPosts((prev) => {
+                const next = prev.filter((p) => p.id !== deletedId);
+                StorageCache.saveCachedBoardPosts(next);
+                return next;
+              });
             }
           }
         )
         .subscribe();
 
       return () => {
+        isMounted = false;
         if (supabase) {
           supabase.removeChannel(channel);
         }
       };
     }
-  }, []);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [syncFromCloud]);
 
   // Sprawdzanie czy wystawka wygasła (TTL = 6 godzin od wystawienia lub ostatniego potwierdzenia)
   const isItemActive = (item: PostItem): boolean => {
     if (item.status !== 'active') return false;
-    if (item.type === 'wystawka') {
+    if (adminSettings.autoExpireEnabled && item.type === 'wystawka') {
       const expiry = item.expiresAt
         ? new Date(item.expiresAt).getTime()
         : new Date(item.createdAt).getTime() + 6 * 60 * 60 * 1000;
-      if (Date.now() > expiry) {
+      if (nowTimestamp > expiry) {
         return false;
       }
     }
     return true;
   };
 
-  // Filter items (status + type + search query + TTL + distance)
+  const isAuthorBlocked = (authorName?: string): boolean => {
+    if (!authorName) return false;
+    const lower = authorName.trim().toLowerCase();
+    return adminSettings.blockedAuthors.some((a) => a.toLowerCase() === lower);
+  };
+
+  const isItemVisible = (item: PostItem): boolean =>
+    isItemActive(item) && !isAuthorBlocked(item.authorName);
+
+  // Filter items (status + blocked authors + type + search query + TTL + distance)
   const filteredItems = items.filter((item) => {
-    if (!isItemActive(item)) return false;
+    if (!isItemVisible(item)) return false;
     if (filterType !== 'all' && item.type !== filterType) return false;
 
     if (maxDistanceKm > 0 && userCoords) {
@@ -322,7 +655,7 @@ export default function App() {
   });
 
   const itemsInRadiusCount = items.filter((item) => {
-    if (!isItemActive(item)) return false;
+    if (!isItemVisible(item)) return false;
     if (!userCoords) return true;
     const dist = calculateDistance(
       userCoords.latitude,
@@ -333,41 +666,136 @@ export default function App() {
     return isDistanceInNeighborhood(dist, neighborhoodSettings);
   }).length;
 
-  const wystawkaCount = items.filter((i) => isItemActive(i) && i.type === 'wystawka').length;
-  const oddamCount = items.filter((i) => isItemActive(i) && i.type === 'oddam').length;
+  const wystawkaCount = items.filter((i) => isItemVisible(i) && i.type === 'wystawka').length;
+  const oddamCount = items.filter((i) => isItemVisible(i) && i.type === 'oddam').length;
 
-  // Handlers
-  const handleAddItem = (newItem: PostItem) => {
-    setItems((prev) => [newItem, ...prev]);
-    setSelectedMapItem(newItem);
-    setDetailItem(newItem);
-    // Zapis w chmurze
-    insertItemToCloud(newItem);
-    StorageCache.recordPostCreated().then((s) => setEcoStats(s)).catch(() => {});
+  const dashboardItems = [...items]
+    .filter((i) => isItemVisible(i))
+    .sort((a, b) => {
+      if (!userCoords) return 0;
+      const distA = calculateDistance(
+        userCoords.latitude,
+        userCoords.longitude,
+        a.location.latitude,
+        a.location.longitude
+      ).value;
+      const distB = calculateDistance(
+        userCoords.latitude,
+        userCoords.longitude,
+        b.location.latitude,
+        b.location.longitude
+      ).value;
+      return distA - distB;
+    });
+
+  const refreshGpsLocation = async (showPermissionAlerts: boolean) => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        if (showPermissionAlerts) {
+          Alert.alert('Brak uprawnień GPS', 'Włącz dostęp do lokalizacji w ustawieniach telefonu.');
+        }
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const nextGps = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+      setGpsCoords(nextGps);
+      if (Platform.OS !== 'web') {
+        try {
+          const reverse = await Location.reverseGeocodeAsync(nextGps);
+          if (reverse.length > 0) {
+            const detectedCity = reverse[0].city || reverse[0].subregion || null;
+            if (detectedCity) setGpsCityName(detectedCity);
+          }
+        } catch {
+          // Ignorujemy błąd reverse geocodingu
+        }
+      }
+    } catch {
+      if (showPermissionAlerts) {
+        Alert.alert('Błąd lokalizacji', 'Nie udało się ustalić pozycji GPS. Upewnij się, że usługa lokalizacji jest włączona w telefonie.');
+      }
+    }
   };
 
-  const handleVoteStillThere = (itemId: string) => {
-    setItems((prev) =>
-      prev.map((it) => {
+  const handleSelectCity = (city: CityOption | null) => {
+    setSelectedCity(city);
+    setSelectedMapItem(null);
+    StorageCache.saveSelectedCity(city);
+    if (!city) {
+      refreshGpsLocation(false);
+    }
+  };
+
+  // Handlers
+  const handleAddItem = async (newItem: PostItem): Promise<boolean> => {
+    let itemToSave = newItem;
+    if (isSupabaseConfigured) {
+      const res = await insertItemToCloud(newItem);
+      if (!res.ok) {
+        if (res.error.code === 'UPLOAD' || res.error.code === 'VALIDATION') {
+          Alert.alert('Nie można dodać ogłoszenia', res.error.message);
+          return false;
+        }
+        if (res.error.code === 'NETWORK') {
+          await StorageCache.enqueueSyncAction({
+            id: `sync-item-${Date.now()}`,
+            kind: 'insert_item',
+            payload: newItem,
+            createdAt: new Date().toISOString(),
+          });
+          Alert.alert(
+            'Zapisano lokalnie 📶',
+            'Brak zasięgu – ogłoszenie pojawiło się na Twoim urządzeniu i wyśle się automatycznie po odzyskaniu sieci.'
+          );
+        }
+      } else {
+        itemToSave = res.data;
+      }
+    }
+
+    setItems((prev) => {
+      const next = [itemToSave, ...prev];
+      StorageCache.saveCachedItems(next);
+      return next;
+    });
+    setSelectedMapItem(itemToSave);
+    setDetailItem(itemToSave);
+    StorageCache.recordPostCreated()
+      .then((s) => setEcoStats(s))
+      .catch(() => {});
+    return true;
+  };
+
+  const handleVoteStillThere = async (itemId: string) => {
+    const now = Date.now();
+    setItems((prev) => {
+      const next = prev.map((it) => {
         if (it.id === itemId) {
-          // Każde potwierdzenie "Jeszcze stoi" przedłuża widoczność wystawki o kolejne 2 godziny
-          const currentExpiry = it.expiresAt ? new Date(it.expiresAt).getTime() : Date.now();
-          const extendedExpiry = new Date(Math.max(currentExpiry, Date.now()) + 2 * 60 * 60 * 1000).toISOString();
+          const currentExpiry = it.expiresAt ? new Date(it.expiresAt).getTime() : now;
+          const extendedExpiry = new Date(
+            Math.max(currentExpiry, now) + 2 * 60 * 60 * 1000
+          ).toISOString();
           return {
             ...it,
             stillThereVotes: it.stillThereVotes + 1,
-            takenVotes: 0, // Reset zgłoszeń o zabraniu po potwierdzeniu obecności
+            takenVotes: 0,
             expiresAt: extendedExpiry,
           };
         }
         return it;
-      })
-    );
+      });
+      StorageCache.saveCachedItems(next);
+      return next;
+    });
+
     if (detailItem && detailItem.id === itemId) {
       setDetailItem((prev) => {
         if (!prev) return null;
-        const currentExpiry = prev.expiresAt ? new Date(prev.expiresAt).getTime() : Date.now();
-        const extendedExpiry = new Date(Math.max(currentExpiry, Date.now()) + 2 * 60 * 60 * 1000).toISOString();
+        const currentExpiry = prev.expiresAt ? new Date(prev.expiresAt).getTime() : now;
+        const extendedExpiry = new Date(
+          Math.max(currentExpiry, now) + 2 * 60 * 60 * 1000
+        ).toISOString();
         return {
           ...prev,
           stillThereVotes: prev.stillThereVotes + 1,
@@ -376,14 +804,33 @@ export default function App() {
         };
       });
     }
-    voteStillThereInCloud(itemId);
-    Alert.alert('Super! 👍', 'Potwierdziłeś obecność wystawki. Przedłużono jej czas widoczności o 2 godziny!');
+
+    if (isSupabaseConfigured) {
+      const voterKey = await StorageCache.getVoterKey();
+      const res = await voteStillThereInCloud(itemId, voterKey);
+      if (!res.ok && res.error.code === 'NETWORK') {
+        await StorageCache.enqueueSyncAction({
+          id: `sync-still-${Date.now()}`,
+          kind: 'vote_still_there',
+          itemId,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    Alert.alert(
+      'Super! 👍',
+      'Potwierdziłeś obecność wystawki. Przedłużono jej czas widoczności o 2 godziny!'
+    );
   };
 
   const handleVoteTaken = async (itemId: string) => {
-    let result: { newStatus: 'active' | 'taken'; takenVotes: number } = { newStatus: 'active', takenVotes: 1 };
-    setItems((prev) =>
-      prev.map((it) => {
+    let result: { newStatus: 'active' | 'taken'; takenVotes: number } = {
+      newStatus: 'active',
+      takenVotes: 1,
+    };
+    setItems((prev) => {
+      const next = prev.map((it) => {
         if (it.id === itemId) {
           const newVotes = it.takenVotes + 1;
           const newStatus: 'active' | 'taken' = newVotes >= 2 ? 'taken' : 'active';
@@ -391,8 +838,10 @@ export default function App() {
           return { ...it, takenVotes: newVotes, status: newStatus };
         }
         return it;
-      })
-    );
+      });
+      StorageCache.saveCachedItems(next);
+      return next;
+    });
 
     if (detailItem && detailItem.id === itemId) {
       setDetailItem((prev) =>
@@ -406,12 +855,34 @@ export default function App() {
       );
     }
 
-    try {
-      await voteTakenInCloud(itemId);
-    } catch (e) {}
+    if (isSupabaseConfigured) {
+      const voterKey = await StorageCache.getVoterKey();
+      const cloudRes = await voteTakenInCloud(itemId, voterKey);
+      if (cloudRes.ok) {
+        result = cloudRes.data;
+        setItems((prev) => {
+          const synced = prev.map((it) =>
+            it.id === itemId
+              ? { ...it, takenVotes: cloudRes.data.takenVotes, status: cloudRes.data.newStatus }
+              : it
+          );
+          StorageCache.saveCachedItems(synced);
+          return synced;
+        });
+      } else if (cloudRes.error.code === 'NETWORK') {
+        await StorageCache.enqueueSyncAction({
+          id: `sync-taken-${Date.now()}`,
+          kind: 'vote_taken',
+          itemId,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
 
     if (result.newStatus === 'taken') {
-      StorageCache.recordRescue().then((s) => setEcoStats(s)).catch(() => {});
+      StorageCache.recordRescue()
+        .then((s) => setEcoStats(s))
+        .catch(() => {});
       Alert.alert(
         'Ogłoszenie zarchiwizowane 📦',
         'Drugie niezależne potwierdzenie zabrania! Przedmiot został usunięty z mapy i listy.'
@@ -425,16 +896,65 @@ export default function App() {
   };
 
   // Handlers dla Tablicy Ogłoszeń
-  const handleAddBoardPost = (newPost: BoardPost) => {
-    setBoardPosts((prev) => [newPost, ...prev]);
+  const handleAddBoardPost = async (newPost: BoardPost) => {
+    setBoardPosts((prev) => {
+      const next = [newPost, ...prev];
+      StorageCache.saveCachedBoardPosts(next);
+      return next;
+    });
+
+    if (isSupabaseConfigured) {
+      const res = await BoardRepository.insert(newPost);
+      if (!res.ok && res.error.code === 'NETWORK') {
+        await StorageCache.enqueueSyncAction({
+          id: `sync-board-${Date.now()}`,
+          kind: 'insert_board_post',
+          payload: newPost,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
   };
 
-  const handleLikeBoardPost = (postId: string) => {
-    setBoardPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId ? { ...p, likesCount: p.likesCount + 1 } : p
-      )
-    );
+  const handleLikeBoardPost = async (postId: string) => {
+    const alreadyLiked = likedBoardPostIds.includes(postId);
+    const nextLikedIds = alreadyLiked
+      ? likedBoardPostIds.filter((id) => id !== postId)
+      : [...likedBoardPostIds, postId];
+
+    setLikedBoardPostIds(nextLikedIds);
+    StorageCache.saveLikedBoardPostIds(nextLikedIds);
+
+    setBoardPosts((prev) => {
+      const next = prev.map((p) => {
+        if (p.id !== postId) return p;
+        const delta = alreadyLiked ? -1 : 1;
+        return { ...p, likesCount: Math.max(0, p.likesCount + delta) };
+      });
+      StorageCache.saveCachedBoardPosts(next);
+      return next;
+    });
+
+    if (isSupabaseConfigured) {
+      const voterKey = await StorageCache.getVoterKey();
+      const res = await BoardRepository.toggleLike(postId, voterKey);
+      if (res.ok) {
+        setBoardPosts((prev) => {
+          const synced = prev.map((p) =>
+            p.id === postId ? { ...p, likesCount: res.data.likesCount } : p
+          );
+          StorageCache.saveCachedBoardPosts(synced);
+          return synced;
+        });
+      } else if (res.error.code === 'NETWORK') {
+        await StorageCache.enqueueSyncAction({
+          id: `sync-like-${Date.now()}`,
+          kind: 'toggle_board_like',
+          postId,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
   };
 
   // Handlers dla Zapisanych (Gwiazdka)
@@ -447,15 +967,19 @@ export default function App() {
   };
 
   const handleToggleSaveBoardPost = (postId: string) => {
-    setSavedBoardPostIds((prev) =>
-      prev.includes(postId) ? prev.filter((id) => id !== postId) : [...prev, postId]
-    );
+    setSavedBoardPostIds((prev) => {
+      const next = prev.includes(postId) ? prev.filter((id) => id !== postId) : [...prev, postId];
+      StorageCache.saveSavedBoardPostIds(next);
+      return next;
+    });
   };
 
-  const handleLoginProvider = async (provider: AuthProvider, customName?: string, customEmail?: string) => {
-    const user = await AuthService.signInWithProvider(provider, customName, customEmail);
-    setCurrentUser(user);
-    setIsLoginModalVisible(false);
+  const handleLoginProvider = async (_provider: AuthProvider, _customName?: string, _customEmail?: string) => {
+    const user = await AuthService.getUserProfile();
+    if (user) {
+      setCurrentUser(user);
+      setIsLoginModalVisible(false);
+    }
   };
 
   const handleLoginSuccess = (user: UserProfile) => {
@@ -480,7 +1004,7 @@ export default function App() {
   const handleOpenChat = (item: PostItem | null) => {
     if (!item) return;
     setChatItem(item);
-    if (currentUser) {
+    if (!adminSettings.accountsEnabled || currentUser) {
       setIsChatModalVisible(true);
     } else {
       Alert.alert(
@@ -492,6 +1016,255 @@ export default function App() {
         ]
       );
     }
+  };
+
+  // Handlery Panelu Administratora
+  const handleUpdateAdminSettings = (next: AdminSettings) => {
+    setAdminSettings(next);
+    setShowBetaNotice(next.bannerEnabled);
+    StorageCache.saveAdminSettings(next);
+  };
+
+  const handleAdminRestoreItem = (itemId: string) => {
+    const newExpiry = new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString();
+    setItems((prev) => {
+      const updated = prev.map((it) =>
+        it.id === itemId
+          ? { ...it, status: 'active' as const, takenVotes: 0, expiresAt: newExpiry }
+          : it
+      );
+      StorageCache.saveCachedItems(updated);
+      return updated;
+    });
+    if (detailItem?.id === itemId) {
+      setDetailItem((prev) =>
+        prev ? { ...prev, status: 'active', takenVotes: 0, expiresAt: newExpiry } : null
+      );
+    }
+    restoreItemInCloud(itemId);
+  };
+
+  const handleAdminArchiveItem = (itemId: string) => {
+    setItems((prev) => {
+      const updated = prev.map((it) =>
+        it.id === itemId ? { ...it, status: 'taken' as const } : it
+      );
+      StorageCache.saveCachedItems(updated);
+      return updated;
+    });
+    if (detailItem?.id === itemId) {
+      setDetailItem(null);
+    }
+    if (selectedMapItem?.id === itemId) {
+      setSelectedMapItem(null);
+    }
+    archiveItemInCloud(itemId);
+  };
+
+  const handleAdminDeleteItem = (itemId: string) => {
+    setItems((prev) => {
+      const updated = prev.filter((it) => it.id !== itemId);
+      StorageCache.saveCachedItems(updated);
+      return updated;
+    });
+    setSavedItemIds((prev) => {
+      const next = prev.filter((id) => id !== itemId);
+      StorageCache.saveSavedIds(next);
+      return next;
+    });
+    if (detailItem?.id === itemId) {
+      setDetailItem(null);
+    }
+    if (selectedMapItem?.id === itemId) {
+      setSelectedMapItem(null);
+    }
+    deleteItemFromCloud(itemId);
+  };
+
+  const handleAdminDeleteBoardPost = (postId: string) => {
+    setBoardPosts((prev) => {
+      const next = prev.filter((p) => p.id !== postId);
+      StorageCache.saveCachedBoardPosts(next);
+      return next;
+    });
+    setSavedBoardPostIds((prev) => {
+      const next = prev.filter((id) => id !== postId);
+      StorageCache.saveSavedBoardPostIds(next);
+      return next;
+    });
+    if (isSupabaseConfigured) {
+      BoardRepository.remove(postId).catch(() => {});
+    }
+  };
+
+  const handleAdminUpdateItem = (updatedItem: PostItem) => {
+    setItems((prev) => {
+      const next = prev.map((it) => (it.id === updatedItem.id ? updatedItem : it));
+      StorageCache.saveCachedItems(next);
+      return next;
+    });
+    if (detailItem?.id === updatedItem.id) {
+      setDetailItem(updatedItem);
+    }
+    if (selectedMapItem?.id === updatedItem.id) {
+      setSelectedMapItem(updatedItem);
+    }
+    updateItemInCloud(updatedItem);
+  };
+
+  const handleAdminResetItemFlags = (itemId: string) => {
+    setItems((prev) => {
+      const next = prev.map((it) =>
+        it.id === itemId ? { ...it, takenVotes: 0, status: 'active' as const } : it
+      );
+      StorageCache.saveCachedItems(next);
+      return next;
+    });
+    if (detailItem?.id === itemId) {
+      setDetailItem((prev) => (prev ? { ...prev, takenVotes: 0, status: 'active' } : null));
+    }
+    resetItemFlagsInCloud(itemId);
+  };
+
+  const handleAdminBulkItemAction = (
+    itemIds: string[],
+    action: 'restore' | 'archive' | 'delete'
+  ) => {
+    const idSet = new Set(itemIds);
+    const newExpiry = new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString();
+    setItems((prev) => {
+      const next =
+        action === 'delete'
+          ? prev.filter((it) => !idSet.has(it.id))
+          : prev.map((it) => {
+              if (!idSet.has(it.id)) return it;
+              if (action === 'restore') {
+                return { ...it, status: 'active' as const, takenVotes: 0, expiresAt: newExpiry };
+              }
+              return { ...it, status: 'taken' as const };
+            });
+      StorageCache.saveCachedItems(next);
+      return next;
+    });
+
+    if (action === 'delete') {
+      setSavedItemIds((prev) => {
+        const next = prev.filter((id) => !idSet.has(id));
+        StorageCache.saveSavedIds(next);
+        return next;
+      });
+    }
+
+    if (detailItem && idSet.has(detailItem.id)) {
+      if (action === 'restore') {
+        setDetailItem((prev) =>
+          prev ? { ...prev, status: 'active', takenVotes: 0, expiresAt: newExpiry } : null
+        );
+      } else {
+        setDetailItem(null);
+      }
+    }
+    if (selectedMapItem && idSet.has(selectedMapItem.id) && action !== 'restore') {
+      setSelectedMapItem(null);
+    }
+
+    for (const id of itemIds) {
+      if (action === 'restore') restoreItemInCloud(id);
+      else if (action === 'archive') archiveItemInCloud(id);
+      else deleteItemFromCloud(id);
+    }
+  };
+
+  const handleAdminUpdateBoardPost = (updatedPost: BoardPost) => {
+    setBoardPosts((prev) => {
+      const next = prev.map((p) => (p.id === updatedPost.id ? updatedPost : p));
+      StorageCache.saveCachedBoardPosts(next);
+      return next;
+    });
+  };
+
+  const handleAdminToggleBlockAuthor = (authorName: string) => {
+    const cleaned = authorName.trim();
+    if (!cleaned) return;
+    const lower = cleaned.toLowerCase();
+    const exists = adminSettings.blockedAuthors.some((a) => a.toLowerCase() === lower);
+    const nextBlocked = exists
+      ? adminSettings.blockedAuthors.filter((a) => a.toLowerCase() !== lower)
+      : [...adminSettings.blockedAuthors, cleaned];
+    handleUpdateAdminSettings({
+      ...adminSettings,
+      blockedAuthors: nextBlocked,
+    });
+  };
+
+  const handleAdminUpdateBannerImage = (slotId: BannerSlotId, uri: string | null) => {
+    const nextBanners = { ...adminSettings.customBanners };
+    if (uri && uri.trim().length > 0) {
+      nextBanners[slotId] = uri.trim();
+    } else {
+      delete nextBanners[slotId];
+    }
+    handleUpdateAdminSettings({
+      ...adminSettings,
+      customBanners: nextBanners,
+    });
+  };
+
+  const handleAdminResetAllBanners = () => {
+    handleUpdateAdminSettings({
+      ...adminSettings,
+      customBanners: {},
+    });
+  };
+
+  const handleAdminPublishOfficialNotice = (title: string, content: string) => {
+    const newPost: BoardPost = {
+      id: `admin-notice-${Date.now()}`,
+      title,
+      content,
+      tag: 'info',
+      authorName: 'Administrator Śmieciarki',
+      locationArea: selectedCity?.name || gpsCityName || 'Cała społeczność',
+      createdAt: new Date().toISOString(),
+      likesCount: 0,
+    };
+    setBoardPosts((prev) => {
+      const next = [newPost, ...prev];
+      StorageCache.saveCachedBoardPosts(next);
+      return next;
+    });
+    if (isSupabaseConfigured) {
+      BoardRepository.insert(newPost).catch(() => {});
+    }
+  };
+
+  const handleAdminSyncCloud = async (): Promise<number> => {
+    await flushPendingSyncQueue();
+    const res = await fetchItemsFromCloud();
+    if (res.ok) {
+      setCloudLoadError(null);
+      setItems(res.data);
+      await StorageCache.saveCachedItems(res.data);
+      return res.data.length;
+    }
+    return 0;
+  };
+
+  const handleAdminResetDemoData = () => {
+    setItems(INITIAL_ITEMS);
+    setBoardPosts(INITIAL_BOARD_POSTS);
+    StorageCache.saveCachedItems(INITIAL_ITEMS);
+    StorageCache.saveCachedBoardPosts(INITIAL_BOARD_POSTS);
+  };
+
+  const handleAdminClearCache = async () => {
+    await StorageCache.clearCachedItems();
+    setSavedItemIds([]);
+    setSavedBoardPostIds([]);
+    setLikedBoardPostIds([]);
+    await StorageCache.saveSavedIds([]);
+    await StorageCache.saveSavedBoardPostIds([]);
+    await StorageCache.saveLikedBoardPostIds([]);
   };
 
   // Obsługa samouczka krok po kroku
@@ -522,8 +1295,10 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+      <View style={styles.rootContainer}>
+        <SpotlightBackground />
+        <SafeAreaView style={styles.container}>
+          <StatusBar style="dark" />
 
         {/* Pomarańczowy pasek informacyjny w stylu Yanosik */}
         {showBetaNotice && (
@@ -536,9 +1311,7 @@ export default function App() {
             >
               <MaterialCommunityIcons name="close" size={20} color="#FFFFFF" />
             </TouchableOpacity>
-            <Text style={styles.bannerText}>
-              to jest wersja beta, może zawierać błędy, z dnia na dzień staramy się ulepszać aplikację, prosimy o wyrozumiałość :)
-            </Text>
+            <Text style={styles.bannerText}>{adminSettings.bannerText}</Text>
             <TouchableOpacity
               style={styles.bannerChevronBtn}
               onPress={() => setShowBetaNotice(false)}
@@ -562,6 +1335,8 @@ export default function App() {
             onSearchChange={setSearchQuery}
             onGoBackToHome={() => setViewMode('home')}
             isDark={false}
+            adsEnabled={adminSettings.adsEnabled}
+            customBanners={adminSettings.customBanners}
           />
         )}
 
@@ -583,11 +1358,15 @@ export default function App() {
               savedCount={savedItemIds.length + savedBoardPostIds.length}
               wystawkaCount={wystawkaCount}
               oddamCount={oddamCount}
-              recentItems={items}
-              usersCount={128}
+              recentItems={dashboardItems}
+              usersCount={adminSettings.usersCount}
               ecoStats={ecoStats}
               streakDays={streakDays}
               neighborhoodSettings={neighborhoodSettings}
+              selectedCity={selectedCity}
+              gpsCityName={gpsCityName}
+              onOpenCityPicker={() => setIsCityModalVisible(true)}
+              userCoords={userCoords}
               onOpenNeighborhoodModal={() => setIsNeighborhoodModalVisible(true)}
               onChangeRadius={(val) => {
                 const clamped = clampNeighborhoodRadius(val);
@@ -616,9 +1395,13 @@ export default function App() {
                 setNeighborhoodSettings(updated);
                 StorageCache.saveNeighborhoodSettings(updated);
               }}
-              currentUser={currentUser}
-              onOpenLogin={() => setIsLoginModalVisible(true)}
-              onSignOut={handleSignOut}
+              currentUser={adminSettings.accountsEnabled ? currentUser : null}
+              showAuthControls={adminSettings.accountsEnabled}
+              adsEnabled={adminSettings.adsEnabled}
+              customBanners={adminSettings.customBanners}
+              onOpenAdmin={() => setIsAdminModalVisible(true)}
+              onOpenLogin={adminSettings.accountsEnabled ? () => setIsLoginModalVisible(true) : undefined}
+              onSignOut={adminSettings.accountsEnabled ? handleSignOut : undefined}
               isDark={false}
               tutorialStepIndex={tutorialStepIndex}
               onNextTutorialStep={handleNextTutorialStep}
@@ -632,29 +1415,48 @@ export default function App() {
               selectedItem={selectedMapItem}
               onSelectItem={setSelectedMapItem}
               onOpenDetail={(item) => setDetailItem(item)}
-              usersCount={128}
+              usersCount={adminSettings.usersCount}
               themeMode="light"
               isDark={false}
+              selectedCity={selectedCity}
+              gpsCityName={gpsCityName}
+              onOpenCityPicker={() => setIsCityModalVisible(true)}
               onRecenterGPS={async () => {
-                try {
-                  const { status } = await Location.requestForegroundPermissionsAsync();
-                  if (status !== 'granted') {
-                    Alert.alert('Brak uprawnień GPS', 'Włącz dostęp do lokalizacji w ustawieniach telefonu.');
-                    return;
-                  }
-                  const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-                  setUserCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-                } catch (e) {
-                  Alert.alert('Błąd lokalizacji', 'Nie udało się ustalić pozycji GPS. Upewnij się, że usługa lokalizacji jest włączona w telefonie.');
-                }
+                handleSelectCity(null);
+                await refreshGpsLocation(true);
               }}
             />
           ) : viewMode === 'list' ? (
             <FlatList
               data={sortedItems}
               keyExtractor={(item) => item.id}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isCloudRefreshing}
+                  onRefresh={handleRefreshCloud}
+                  tintColor={THEME.primary}
+                  colors={[THEME.primary]}
+                />
+              }
               ListHeaderComponent={
-                <View style={styles.listFiltersContainer}>
+                <View>
+                  {cloudLoadError ? (
+                    <View style={styles.cloudErrorBanner}>
+                      <MaterialCommunityIcons name="wifi-off" size={16} color="#B45309" />
+                      <Text style={styles.cloudErrorText} numberOfLines={2}>
+                        {cloudLoadError}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={handleRefreshCloud}
+                        style={styles.cloudErrorRetryBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel={STRINGS_PL.common.retry}
+                      >
+                        <Text style={styles.cloudErrorRetryText}>{STRINGS_PL.common.retry}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+                  <View style={styles.listFiltersContainer}>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -732,6 +1534,7 @@ export default function App() {
                       ))}
                     </ScrollView>
                   </View>
+                </View>
               }
               renderItem={({ item }) => (
                 <ItemCard
@@ -782,17 +1585,24 @@ export default function App() {
             />
           ) : viewMode === 'board' ? (
             <BoardTab
-              posts={boardPosts}
+              posts={boardPosts.filter((p) => !isAuthorBlocked(p.authorName))}
               searchQuery={searchQuery}
+              likedPostIds={likedBoardPostIds}
               onLikeToggle={handleLikeBoardPost}
               onOpenAddPost={() => setIsAddBoardModalVisible(true)}
               savedPostIds={savedBoardPostIds}
               onToggleSavePost={handleToggleSaveBoardPost}
+              isRefreshing={isCloudRefreshing}
+              onRefresh={handleRefreshCloud}
             />
           ) : (
             <SavedTab
-              savedItems={items.filter((i) => savedItemIds.includes(i.id))}
-              savedBoardPosts={boardPosts.filter((p) => savedBoardPostIds.includes(p.id))}
+              savedItems={items.filter((i) => savedItemIds.includes(i.id) && !isAuthorBlocked(i.authorName))}
+              savedBoardPosts={boardPosts.filter(
+                (p) => savedBoardPostIds.includes(p.id) && !isAuthorBlocked(p.authorName)
+              )}
+              likedPostIds={likedBoardPostIds}
+              onLikeToggle={handleLikeBoardPost}
               userCoords={userCoords}
               onOpenItemDetail={(item) => setDetailItem(item)}
               onToggleSaveItem={handleToggleSaveItem}
@@ -980,7 +1790,7 @@ export default function App() {
           visible={isAddModalVisible}
           onClose={() => setIsAddModalVisible(false)}
           onAddItem={handleAddItem}
-          userCoords={userCoords}
+          userCoords={gpsCoords}
         />
 
         <AddBoardPostModal
@@ -998,7 +1808,8 @@ export default function App() {
           onVoteTaken={handleVoteTaken}
           isSaved={detailItem ? savedItemIds.includes(detailItem.id) : false}
           onToggleSave={() => detailItem && handleToggleSaveItem(detailItem.id)}
-          currentUser={currentUser}
+          currentUser={adminSettings.accountsEnabled ? currentUser : null}
+          accountsEnabled={adminSettings.accountsEnabled}
           onOpenChat={() => handleOpenChat(detailItem)}
         />
 
@@ -1013,22 +1824,71 @@ export default function App() {
           itemsInRadiusCount={itemsInRadiusCount}
         />
 
-        {/* Modal Logowania / Rejestracji (Apple, Google, Facebook, E-mail + Tryb Gość) */}
-        <LoginScreenModal
-          visible={isLoginModalVisible}
-          onClose={() => setIsLoginModalVisible(false)}
-          onLoginProvider={handleLoginProvider}
-          onLoginSuccess={handleLoginSuccess}
-          onContinueAsGuest={handleContinueAsGuest}
+        <CityPickerModal
+          visible={isCityModalVisible}
+          onClose={() => setIsCityModalVisible(false)}
+          selectedCity={selectedCity}
+          onSelectCity={handleSelectCity}
+          gpsCityName={gpsCityName}
+          items={items.filter((i) => isItemActive(i) && !isAuthorBlocked(i.authorName))}
         />
+
+        {/* Modal Logowania / Rejestracji */}
+        {adminSettings.accountsEnabled && (
+          <LoginScreenModal
+            visible={isLoginModalVisible}
+            onClose={() => setIsLoginModalVisible(false)}
+            onLoginProvider={handleLoginProvider}
+            onLoginSuccess={handleLoginSuccess}
+            onContinueAsGuest={handleContinueAsGuest}
+          />
+        )}
 
         {/* Modal czatu sąsiedzkiego o wystawce */}
         <ItemChatModal
           visible={isChatModalVisible}
           onClose={() => setIsChatModalVisible(false)}
           item={chatItem}
-          currentUser={currentUser}
+          currentUser={adminSettings.accountsEnabled ? currentUser : null}
+          accountsEnabled={adminSettings.accountsEnabled}
           onOpenLogin={() => setIsLoginModalVisible(true)}
+        />
+
+        {/* Panel Administratora */}
+        <AdminPanelModal
+          visible={isAdminModalVisible}
+          onClose={() => setIsAdminModalVisible(false)}
+          items={items}
+          boardPosts={boardPosts}
+          savedCount={savedItemIds.length + savedBoardPostIds.length}
+          ecoStats={ecoStats}
+          streakDays={streakDays}
+          selectedCity={selectedCity}
+          gpsCityName={gpsCityName}
+          neighborhoodSettings={neighborhoodSettings}
+          adminSettings={adminSettings}
+          onUpdateAdminSettings={handleUpdateAdminSettings}
+          onOpenItemDetail={(item) => {
+            setIsAdminModalVisible(false);
+            setDetailItem(item);
+          }}
+          onUpdateItem={handleAdminUpdateItem}
+          onResetItemFlags={handleAdminResetItemFlags}
+          onRestoreItem={handleAdminRestoreItem}
+          onArchiveItem={handleAdminArchiveItem}
+          onDeleteItem={handleAdminDeleteItem}
+          onBulkItemAction={handleAdminBulkItemAction}
+          onUpdateBoardPost={handleAdminUpdateBoardPost}
+          onDeleteBoardPost={handleAdminDeleteBoardPost}
+          onToggleBlockAuthor={handleAdminToggleBlockAuthor}
+          onUpdateBannerImage={handleAdminUpdateBannerImage}
+          onResetAllBanners={handleAdminResetAllBanners}
+          onPublishOfficialNotice={handleAdminPublishOfficialNotice}
+          onSyncCloud={handleAdminSyncCloud}
+          onResetDemoData={handleAdminResetDemoData}
+          onClearCache={handleAdminClearCache}
+          onRestartTutorial={handleRestartTutorial}
+          isItemActiveCheck={isItemActive}
         />
 
         {/* Ekran powitalny (Splash Screen - 5 sekund z możliwością wcześniejszego zamknięcia przyciskiem X) */}
@@ -1056,15 +1916,20 @@ export default function App() {
             </SafeAreaView>
           </View>
         </Modal>
-      </SafeAreaView>
+        </SafeAreaView>
+      </View>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  rootContainer: {
+    flex: 1,
+    backgroundColor: '#CBD5E1',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
   containerDark: {
     backgroundColor: '#0B0F19',
@@ -1100,7 +1965,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'transparent',
   },
   contentDark: {
     backgroundColor: '#0B0F19',
@@ -1407,8 +2272,13 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
-    marginTop: 40,
+    padding: 32,
+    marginTop: 32,
+    marginHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    borderWidth: 1,
+    borderColor: 'rgba(209, 250, 229, 0.9)',
   },
   emptyTitle: {
     fontSize: 16,
@@ -1421,6 +2291,37 @@ const styles = StyleSheet.create({
     color: THEME.textMuted,
     marginTop: 4,
     textAlign: 'center',
+  },
+  cloudErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 14,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  cloudErrorText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400E',
+  },
+  cloudErrorRetryBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#F59E0B',
+  },
+  cloudErrorRetryText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   welcomeContainer: {
     flex: 1,

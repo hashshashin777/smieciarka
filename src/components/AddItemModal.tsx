@@ -10,10 +10,10 @@ import {
   Image,
   Alert,
   ActivityIndicator,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -23,7 +23,7 @@ import { CATEGORIES, THEME } from '../constants/categories';
 interface AddItemModalProps {
   visible: boolean;
   onClose: () => void;
-  onAddItem: (newItem: PostItem) => void;
+  onAddItem: (newItem: PostItem) => boolean | void | Promise<boolean | void>;
   userCoords?: { latitude: number; longitude: number } | null;
 }
 
@@ -74,7 +74,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       if (!result.canceled && result.assets.length > 0) {
         setPhotoUri(result.assets[0].uri);
       }
-    } catch (err) {
+    } catch {
       Alert.alert('Błąd aparatu', 'Nie udało się otworzyć aparatu.');
     }
   };
@@ -96,7 +96,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       if (!result.canceled && result.assets.length > 0) {
         setPhotoUri(result.assets[0].uri);
       }
-    } catch (err) {
+    } catch {
       Alert.alert('Błąd galerii', 'Nie udało się otworzyć galerii.');
     }
   };
@@ -130,14 +130,21 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       } else {
         setAddress('Bieżąca dokładna lokalizacja GPS');
       }
-    } catch (err) {
+    } catch {
       Alert.alert('Błąd GPS', 'Nie udało się pobrać współrzędnych.');
     } finally {
       setIsLocating(false);
     }
   };
 
-  const handleSubmit = () => {
+  const handleClose = () => {
+    if (isSubmitting) return;
+    resetForm();
+    onClose();
+  };
+
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
     if (!title.trim()) {
       Alert.alert('Uzupełnij tytuł', 'Podaj nazwę przedmiotu (np. "Fotel drewniany").');
       return;
@@ -148,10 +155,17 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       return;
     }
 
-    setIsSubmitting(true);
+    const finalLat = coords?.latitude ?? userCoords?.latitude;
+    const finalLng = coords?.longitude ?? userCoords?.longitude;
+    if (finalLat === undefined || finalLng === undefined) {
+      Alert.alert(
+        'Brak lokalizacji GPS',
+        'Pobierz lokalizację przyciskiem „Pobierz moje GPS”, aby przypiąć znalezisko we właściwym miejscu na mapie.'
+      );
+      return;
+    }
 
-    const finalLat = coords?.latitude ?? userCoords?.latitude ?? 52.2297;
-    const finalLng = coords?.longitude ?? userCoords?.longitude ?? 21.0122;
+    setIsSubmitting(true);
 
     const newItem: PostItem = {
       id: `post-${Date.now()}`,
@@ -164,33 +178,41 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
         latitude: finalLat,
         longitude: finalLng,
         address: address.trim() || (type === 'wystawka' ? 'Lokalizacja uliczna' : 'Okolice centrum'),
-        isExact: true,
+        isExact: type === 'wystawka',
       },
       createdAt: new Date().toISOString(),
-      expiresAt: type === 'wystawka' 
-        ? new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString() // TTL = 6 godzin dla wystawek
-        : undefined,
+      expiresAt:
+        type === 'wystawka'
+          ? new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString()
+          : undefined,
       status: 'active',
       stillThereVotes: type === 'wystawka' ? 1 : 0,
       takenVotes: 0,
       authorName: 'Ty (Łowca Skarbów)',
     };
 
-    setTimeout(() => {
-      onAddItem(newItem);
+    try {
+      const okResult = await onAddItem(newItem);
+      if (okResult === false) {
+        return;
+      }
       resetForm();
       onClose();
       Alert.alert('Brawo! 🚀', 'Twoje ogłoszenie zostało opublikowane i pojawiło się na mapie!');
-    }, 400);
+    } catch {
+      Alert.alert('Błąd publikacji', 'Nie udało się zapisać ogłoszenia. Spróbuj ponownie.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           {/* Top Header */}
           <View style={styles.topBar}>
-            <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
+            <TouchableOpacity onPress={handleClose} style={styles.cancelBtn} disabled={isSubmitting}>
               <Text style={styles.cancelBtnText}>Anuluj</Text>
             </TouchableOpacity>
             <Text style={styles.topBarTitle}>Dodaj do Śmieciarki</Text>

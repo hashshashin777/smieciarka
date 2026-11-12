@@ -1,218 +1,155 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
+import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
-import { UserProfile, AuthProvider, ItemMessage } from '../types';
+import { makeRedirectUri } from 'expo-auth-session';
+import { AuthProvider, ItemMessage, UserProfile } from '../types';
+import { STRINGS_PL } from '../i18n/pl';
+import { ChatRepository } from './chatRepository';
+import { StorageCache } from './storageCache';
 import { supabase, isSupabaseConfigured } from './supabase';
 
-// Wymagane przez Expo do obsługi przekierowań OAuth
-WebBrowser.maybeCompleteAuthSession();
-
-const STORAGE_KEYS = {
-  USER_PROFILE: 'smieciarka_user_profile_v1',
+const KEYS = {
+  USER_PROFILE: 'smieciarka_secure_profile_v2',
   GUEST_MODE: 'smieciarka_guest_mode_v1',
-  MESSAGES: 'smieciarka_item_messages_v1',
-  REGISTERED_ACCOUNTS: 'smieciarka_accounts_registry_v1',
+  ADMIN_PIN_HASH: 'smieciarka_admin_pin_hash_v1',
+  ADMIN_PIN_SALT: 'smieciarka_admin_pin_salt_v1',
 };
 
-export interface StoredUserAccount {
-  id: string;
-  name: string;
-  email: string;
-  password?: string;
-  provider: AuthProvider;
-  avatarUrl?: string;
-  createdAt: string;
+function validateStrongPassword(password: string): string | null {
+  if (password.length < 8) {
+    return 'Hasło musi mieć co najmniej 8 znaków.';
+  }
+  if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+    return 'Hasło musi zawierać co najmniej jedną literę i jedną cyfrę.';
+  }
+  return null;
 }
 
-// Domyślne przykładowe wiadomości powitalne dla ofert w celach demonstracyjnych
-const INITIAL_DEMO_MESSAGES: { [itemId: string]: ItemMessage[] } = {
-  'post-lublin-1': [
-    {
-      id: 'msg-demo-1',
-      itemId: 'post-lublin-1',
-      itemTitle: 'Stylowe krzesła gięte Thonet',
-      senderId: 'author-bartek',
-      senderName: 'Bartek (Wystawiający)',
-      senderProvider: 'apple',
-      text: 'Cześć! Krzesła stoją w suchej bramie pod daszkiem. Kto pierwszy, ten lepszy!',
-      createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-      isMyMessage: false,
-    },
-  ],
-  'post-lublin-2': [
-    {
-      id: 'msg-demo-2',
-      itemId: 'post-lublin-2',
-      itemTitle: 'Gramofon Unitra Fonica + winyle',
-      senderId: 'author-marta',
-      senderName: 'Marta B. (Wystawiająca)',
-      senderProvider: 'google',
-      text: 'Dzień dobry! Gramofon jest do odbioru w kamienicy przy Narutowicza do godziny 21:00.',
-      createdAt: new Date(Date.now() - 40 * 60 * 1000).toISOString(),
-      isMyMessage: false,
-    },
-  ],
-};
+async function hashPinWithSalt(pin: string, salt: string): Promise<string> {
+  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, `${salt}:${pin}`);
+}
 
 export const AuthService = {
   async getUserProfile(): Promise<UserProfile | null> {
     try {
-      const data = await AsyncStorage.getItem(STORAGE_KEYS.USER_PROFILE);
-      return data ? JSON.parse(data) : null;
+      const raw = await SecureStore.getItemAsync(KEYS.USER_PROFILE);
+      if (raw) {
+        return JSON.parse(raw) as UserProfile;
+      }
+      if (supabase) {
+        const { data } = await supabase.auth.getUser();
+        const user = data.user;
+        if (user) {
+          const isAdmin = user.app_metadata?.role === 'admin';
+          const restored: UserProfile = {
+            id: user.id,
+            name:
+              (user.user_metadata?.full_name as string) ||
+              user.email?.split('@')[0] ||
+              'Sąsiad',
+            email: user.email || '',
+            avatarUrl: (user.user_metadata?.avatar_url as string) || undefined,
+            provider: (user.app_metadata?.provider as AuthProvider) || 'email',
+            role: isAdmin ? 'admin' : 'user',
+            createdAt: user.created_at || new Date().toISOString(),
+          };
+          await AuthService.saveUserProfile(restored);
+          return restored;
+        }
+      }
+      return null;
     } catch {
       return null;
     }
   },
 
+  async saveUserProfile(profile: UserProfile): Promise<void> {
+    try {
+      await SecureStore.setItemAsync(KEYS.USER_PROFILE, JSON.stringify(profile));
+    } catch {
+      // Ignore secure store errors
+    }
+  },
+
   async isGuestMode(): Promise<boolean> {
     try {
-      const val = await AsyncStorage.getItem(STORAGE_KEYS.GUEST_MODE);
+      const val = await AsyncStorage.getItem(KEYS.GUEST_MODE);
       return val === 'true';
     } catch {
       return false;
     }
   },
 
-  async getRegisteredAccounts(): Promise<StoredUserAccount[]> {
+  async continueAsGuest(): Promise<void> {
     try {
-      const data = await AsyncStorage.getItem(STORAGE_KEYS.REGISTERED_ACCOUNTS);
-      if (data) {
-        return JSON.parse(data);
-      }
+      await AsyncStorage.setItem(KEYS.GUEST_MODE, 'true');
     } catch {
-      // Ignore
-    }
-    // Domyślne konto testowe
-    return [
-      {
-        id: 'user_demo_email',
-        name: 'Sąsiad Marek',
-        email: 'sasiad@smieciarka.fun',
-        password: 'haslo123',
-        provider: 'email',
-        createdAt: new Date().toISOString(),
-      },
-    ];
-  },
-
-  async saveRegisteredAccounts(accounts: StoredUserAccount[]): Promise<void> {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.REGISTERED_ACCOUNTS, JSON.stringify(accounts));
-    } catch {
-      // Ignore
+      // Ignore write error
     }
   },
 
-  // Pełna rejestracja nowego konta e-mail
-  async signUpWithEmail(
-    name: string,
-    email: string,
-    password: string
-  ): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
-    const trimmedEmail = email.trim().toLowerCase();
-    const trimmedName = name.trim();
-
-    if (!trimmedName || trimmedName.length < 2) {
-      return { success: false, error: 'Wpisz swoje imię lub pseudonim sąsiedzki (min. 2 znaki).' };
-    }
-    if (!trimmedEmail || !trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
-      return { success: false, error: 'Podaj poprawny adres e-mail (np. jan@domena.pl).' };
-    }
-    if (!password || password.length < 6) {
-      return { success: false, error: 'Hasło musi mieć co najmniej 6 znaków.' };
-    }
-
-    const accounts = await this.getRegisteredAccounts();
-    const existing = accounts.find((acc) => acc.email.toLowerCase() === trimmedEmail);
-    if (existing) {
-      return { success: false, error: 'Konto o tym adresie e-mail już istnieje. Przełącz się na logowanie.' };
-    }
-
-    const newUserAccount: StoredUserAccount = {
-      id: `user_email_${Date.now()}`,
-      name: trimmedName,
-      email: trimmedEmail,
-      password,
-      provider: 'email',
-      createdAt: new Date().toISOString(),
-    };
-
-    accounts.push(newUserAccount);
-    await this.saveRegisteredAccounts(accounts);
-
-    const profile: UserProfile = {
-      id: newUserAccount.id,
-      name: newUserAccount.name,
-      email: newUserAccount.email,
-      provider: 'email',
-      createdAt: newUserAccount.createdAt,
-    };
-
+  async isCurrentUserAdmin(): Promise<boolean> {
+    if (!supabase) return false;
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
-      await AsyncStorage.setItem(STORAGE_KEYS.GUEST_MODE, 'false');
+      const { data } = await supabase.auth.getUser();
+      return data.user?.app_metadata?.role === 'admin';
     } catch {
-      // Ignore
+      return false;
     }
-
-    return { success: true, user: profile };
   },
 
-  // Logowanie istniejącego konta e-mail
-  async signInWithEmail(
-    email: string,
-    password: string
-  ): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
-    const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail || !password) {
-      return { success: false, error: 'Wypełnij adres e-mail oraz hasło.' };
-    }
-
-    const accounts = await this.getRegisteredAccounts();
-    const account = accounts.find((acc) => acc.email.toLowerCase() === trimmedEmail);
-
-    if (!account) {
-      return { success: false, error: 'Nie znaleziono konta z tym adresem e-mail. Zarejestruj się poniżej.' };
-    }
-
-    if (account.password && account.password !== password) {
-      return { success: false, error: 'Nieprawidłowe hasło. Spróbuj ponownie.' };
-    }
-
-    const profile: UserProfile = {
-      id: account.id,
-      name: account.name,
-      email: account.email,
-      provider: account.provider,
-      avatarUrl: account.avatarUrl,
-      createdAt: account.createdAt,
-    };
-
+  async hasLocalAdminPin(): Promise<boolean> {
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
-      await AsyncStorage.setItem(STORAGE_KEYS.GUEST_MODE, 'false');
+      const hash = await SecureStore.getItemAsync(KEYS.ADMIN_PIN_HASH);
+      return Boolean(hash);
     } catch {
-      // Ignore
+      return false;
     }
-
-    return { success: true, user: profile };
   },
 
-  // Produkcyjne logowanie przez Google OAuth (Supabase + Expo AuthSession)
-  async signInWithGoogle(): Promise<{
-    success: boolean;
-    user?: UserProfile;
-    error?: string;
-    isDemoFallback?: boolean;
-  }> {
-    // Sprawdzamy czy Supabase jest skonfigurowany pod produkcję
+  async setLocalAdminPin(pin: string): Promise<{ ok: boolean; error?: string }> {
+    const trimmed = pin.trim();
+    if (!/^\d{4,8}$/.test(trimmed)) {
+      return { ok: false, error: 'PIN administratora musi składać się z 4–8 cyfr.' };
+    }
+    try {
+      const salt =
+        typeof Crypto.randomUUID === 'function'
+          ? Crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const digest = await hashPinWithSalt(trimmed, salt);
+      await SecureStore.setItemAsync(KEYS.ADMIN_PIN_SALT, salt);
+      await SecureStore.setItemAsync(KEYS.ADMIN_PIN_HASH, digest);
+      return { ok: true };
+    } catch {
+      return { ok: false, error: 'Nie udało się zapisać kodu PIN w bezpiecznej pamięci.' };
+    }
+  },
+
+  async verifyLocalAdminPin(pin: string): Promise<boolean> {
+    try {
+      const salt = await SecureStore.getItemAsync(KEYS.ADMIN_PIN_SALT);
+      const expectedHash = await SecureStore.getItemAsync(KEYS.ADMIN_PIN_HASH);
+      if (!salt || !expectedHash) return false;
+      const digest = await hashPinWithSalt(pin.trim(), salt);
+      return digest === expectedHash;
+    } catch {
+      return false;
+    }
+  },
+
+  async signInWithGoogle(): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
-      const mockUser = await this.signInWithProvider('google');
-      return { success: true, user: mockUser, isDemoFallback: true };
+      return {
+        success: false,
+        error:
+          'Logowanie Google wymaga skonfigurowanego połączenia z serwerem Supabase w pliku .env.',
+      };
     }
 
     try {
-      const redirectUri = AuthSession.makeRedirectUri({
+      const redirectTo = makeRedirectUri({
         scheme: 'smieciarka',
         path: 'auth/callback',
       });
@@ -220,196 +157,249 @@ export const AuthService = {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUri,
+          redirectTo,
           skipBrowserRedirect: true,
         },
       });
 
-      if (error) {
-        return { success: false, error: error.message };
+      if (error || !data?.url) {
+        return { success: false, error: error?.message || 'Nie udało się zainicjować logowania Google.' };
       }
 
-      if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-        if (result.type === 'success' && result.url) {
-          // Parsowanie parametrów z URL po przekierowaniu
-          const urlObj = new URL(result.url);
-          const rawParams = urlObj.hash ? urlObj.hash.replace(/^#/, '') : urlObj.search.replace(/^\?/, '');
-          const params = new URLSearchParams(rawParams);
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
-          const accessToken = params.get('access_token');
-          const refreshToken = params.get('refresh_token');
+      if (result.type === 'success' && result.url) {
+        const parsed = new URL(result.url);
+        const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ''));
+        const queryParams = parsed.searchParams;
 
-          if (accessToken && refreshToken) {
-            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
+        const accessToken = hashParams.get('access_token') || queryParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
+        const authCode = queryParams.get('code');
 
-            if (sessionError) {
-              return { success: false, error: sessionError.message };
-            }
+        let sessionUser = null;
+        if (accessToken && refreshToken) {
+          const { data: sessionData, error: sessionErr } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (sessionErr) return { success: false, error: sessionErr.message };
+          sessionUser = sessionData.user;
+        } else if (authCode) {
+          const { data: exchangeData, error: exchangeErr } =
+            await supabase.auth.exchangeCodeForSession(authCode);
+          if (exchangeErr) return { success: false, error: exchangeErr.message };
+          sessionUser = exchangeData.user;
+        }
 
-            const supaUser = sessionData?.user;
-            if (supaUser) {
-              const fullName =
-                supaUser.user_metadata?.full_name ||
-                supaUser.user_metadata?.name ||
-                'Sąsiad z Google';
-              const email = supaUser.email || 'google@smieciarka.fun';
-              const avatar =
-                supaUser.user_metadata?.avatar_url ||
-                supaUser.user_metadata?.picture ||
-                undefined;
-
-              const profile: UserProfile = {
-                id: supaUser.id,
-                name: fullName,
-                email,
-                provider: 'google',
-                avatarUrl: avatar,
-                createdAt: supaUser.created_at || new Date().toISOString(),
-              };
-
-              await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
-              await AsyncStorage.setItem(STORAGE_KEYS.GUEST_MODE, 'false');
-
-              // Zapisz również do rejestru lokalnego
-              const accounts = await this.getRegisteredAccounts();
-              if (!accounts.some((a) => a.id === profile.id)) {
-                accounts.push({
-                  id: profile.id,
-                  name: profile.name,
-                  email: profile.email,
-                  provider: 'google',
-                  avatarUrl: profile.avatarUrl,
-                  createdAt: profile.createdAt,
-                });
-                await this.saveRegisteredAccounts(accounts);
-              }
-
-              return { success: true, user: profile };
-            }
-          }
-        } else if (result.type === 'cancel' || result.type === 'dismiss') {
-          return { success: false, error: 'Logowanie zostało anulowane.' };
+        if (sessionUser) {
+          const profile: UserProfile = {
+            id: sessionUser.id,
+            name:
+              (sessionUser.user_metadata?.full_name as string) ||
+              (sessionUser.user_metadata?.name as string) ||
+              sessionUser.email?.split('@')[0] ||
+              'Sąsiad Google',
+            email: sessionUser.email || '',
+            avatarUrl:
+              (sessionUser.user_metadata?.avatar_url as string) ||
+              (sessionUser.user_metadata?.picture as string) ||
+              undefined,
+            provider: 'google',
+            role: sessionUser.app_metadata?.role === 'admin' ? 'admin' : 'user',
+            createdAt: new Date().toISOString(),
+          };
+          await AuthService.saveUserProfile(profile);
+          await AsyncStorage.removeItem(KEYS.GUEST_MODE);
+          return { success: true, user: profile };
         }
       }
 
-      return { success: false, error: 'Nie udało się nawiązać połączenia z serwerem Google.' };
-    } catch (err: any) {
-      console.warn('Błąd Google OAuth, użyto trybu demonstracyjnego:', err?.message || err);
-      const fallbackUser = await this.signInWithProvider('google');
-      return { success: true, user: fallbackUser, isDemoFallback: true };
-    }
-  },
-
-  // Rejestracja / Logowanie przez dostawców społecznościowych (Apple, Google, Facebook)
-  async signInWithProvider(
-    provider: AuthProvider,
-    customName?: string,
-    customEmail?: string
-  ): Promise<UserProfile> {
-    const timestamp = Date.now();
-    const defaultNames: Record<AuthProvider, string> = {
-      apple: 'Sąsiad z Apple',
-      google: 'Sąsiad z Google',
-      facebook: 'Sąsiad z Facebooka',
-      email: 'Sąsiad z E-mail',
-    };
-
-    const email = customEmail || `${provider}.user${timestamp.toString().slice(-4)}@smieciarka.fun`;
-    const name = customName || defaultNames[provider];
-
-    const accounts = await this.getRegisteredAccounts();
-    let account = accounts.find((a) => a.provider === provider && a.email === email);
-
-    if (!account) {
-      account = {
-        id: `user_${provider}_${timestamp.toString().slice(-6)}`,
-        name,
-        email,
-        provider,
-        createdAt: new Date().toISOString(),
+      return { success: false, error: 'Logowanie Google zostało przerwane.' };
+    } catch (err) {
+      return {
+        success: false,
+        error:
+          err instanceof Error
+            ? err.message
+            : 'Wystąpił błąd podczas logowania przez Google.',
       };
-      accounts.push(account);
-      await this.saveRegisteredAccounts(accounts);
     }
-
-    const userProfile: UserProfile = {
-      id: account.id,
-      name: account.name,
-      email: account.email,
-      provider: account.provider,
-      avatarUrl: account.avatarUrl,
-      createdAt: account.createdAt,
-    };
-
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(userProfile));
-      await AsyncStorage.setItem(STORAGE_KEYS.GUEST_MODE, 'false');
-    } catch {
-      // Ignore
-    }
-
-    return userProfile;
   },
 
-  async continueAsGuest(): Promise<void> {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.GUEST_MODE, 'true');
-    } catch {
-      // Ignore
+  async signUpWithEmail(
+    name: string,
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; user?: UserProfile; error?: string; needsEmailVerification?: boolean }> {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+
+    if (!cleanName || cleanName.length < 2) {
+      return { success: false, error: 'Podaj imię lub pseudonim (min. 2 znaki).' };
     }
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return { success: false, error: 'Podaj poprawny adres e-mail.' };
+    }
+    const pwdError = validateStrongPassword(password);
+    if (pwdError) {
+      return { success: false, error: pwdError };
+    }
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: 'Rejestracja wymaga aktywnej konfiguracji serwera Supabase.' };
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email: cleanEmail,
+      password,
+      options: {
+        data: { full_name: cleanName },
+        emailRedirectTo: makeRedirectUri({ scheme: 'smieciarka', path: 'auth/callback' }),
+      },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    if (!data.session && data.user) {
+      return {
+        success: false,
+        needsEmailVerification: true,
+        error: 'Wysłaliśmy link aktywacyjny na Twój e-mail. Potwierdź adres, aby się zalogować.',
+      };
+    }
+
+    if (!data.user) {
+      return { success: false, error: STRINGS_PL.errors.genericAction };
+    }
+
+    const profile: UserProfile = {
+      id: data.user.id,
+      name: cleanName,
+      email: data.user.email || cleanEmail,
+      provider: 'email',
+      role: data.user.app_metadata?.role === 'admin' ? 'admin' : 'user',
+      createdAt: new Date().toISOString(),
+    };
+    await AuthService.saveUserProfile(profile);
+    await AsyncStorage.removeItem(KEYS.GUEST_MODE);
+    return { success: true, user: profile };
+  },
+
+  async signInWithEmail(
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail || !password) {
+      return { success: false, error: 'Wpisz adres e-mail oraz hasło.' };
+    }
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: 'Logowanie wymaga aktywnej konfiguracji serwera Supabase.' };
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password,
+    });
+
+    if (error || !data.user) {
+      return { success: false, error: 'Nieprawidłowy adres e-mail lub hasło.' };
+    }
+
+    const profile: UserProfile = {
+      id: data.user.id,
+      name:
+        (data.user.user_metadata?.full_name as string) ||
+        cleanEmail.split('@')[0],
+      email: data.user.email || cleanEmail,
+      provider: 'email',
+      role: data.user.app_metadata?.role === 'admin' ? 'admin' : 'user',
+      createdAt: data.user.created_at || new Date().toISOString(),
+    };
+
+    await AuthService.saveUserProfile(profile);
+    await AsyncStorage.removeItem(KEYS.GUEST_MODE);
+    return { success: true, user: profile };
+  },
+
+  async resetPassword(email: string): Promise<{ ok: boolean; error?: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return { ok: false, error: 'Podaj poprawny adres e-mail do resetu hasła.' };
+    }
+    if (!isSupabaseConfigured || !supabase) {
+      return { ok: false, error: 'Reset hasła wymaga połączenia z serwerem Supabase.' };
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: makeRedirectUri({ scheme: 'smieciarka', path: 'auth/reset' }),
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
   },
 
   async signOut(): Promise<void> {
     try {
-      await AsyncStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
-      await AsyncStorage.setItem(STORAGE_KEYS.GUEST_MODE, 'true');
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
     } catch {
-      // Ignore
+      // Continue clearing local session
+    }
+    try {
+      await SecureStore.deleteItemAsync(KEYS.USER_PROFILE);
+      await AsyncStorage.removeItem(KEYS.GUEST_MODE);
+    } catch {
+      // Ignore cleanup errors
+    }
+  },
+
+  async deleteAccountAndLocalData(): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await AuthService.signOut();
+      await ChatRepository.clearAllLocalChats();
+      await StorageCache.clearAllUserData();
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        error:
+          err instanceof Error
+            ? err.message
+            : 'Nie udało się usunąć lokalnych danych konta.',
+      };
     }
   },
 
   async getItemMessages(itemId: string): Promise<ItemMessage[]> {
-    try {
-      const data = await AsyncStorage.getItem(`${STORAGE_KEYS.MESSAGES}_${itemId}`);
-      if (data) {
-        return JSON.parse(data);
-      }
-    } catch {
-      // Ignore
-    }
-    return INITIAL_DEMO_MESSAGES[itemId] || [];
+    const res = await ChatRepository.fetchMessages(itemId);
+    return res.ok ? res.data : [];
   },
 
   async sendItemMessage(
     itemId: string,
     itemTitle: string,
     text: string,
-    user: UserProfile
+    sender: UserProfile
   ): Promise<ItemMessage> {
-    const existing = await AuthService.getItemMessages(itemId);
-    const newMsg: ItemMessage = {
-      id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    const res = await ChatRepository.sendMessage(itemId, itemTitle, text, {
+      id: sender.id,
+      name: sender.name,
+      provider: sender.provider,
+    });
+    if (res.ok) return res.data;
+    return {
+      id: `msg_err_${Date.now()}`,
       itemId,
       itemTitle,
-      senderId: user.id,
-      senderName: user.name,
-      senderProvider: user.provider,
+      senderId: sender.id,
+      senderName: sender.name,
+      senderProvider: sender.provider,
       text: text.trim(),
       createdAt: new Date().toISOString(),
       isMyMessage: true,
     };
-
-    const updated = [...existing, newMsg];
-    try {
-      await AsyncStorage.setItem(`${STORAGE_KEYS.MESSAGES}_${itemId}`, JSON.stringify(updated));
-    } catch {
-      // Ignore
-    }
-
-    return newMsg;
   },
 };

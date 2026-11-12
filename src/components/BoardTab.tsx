@@ -6,9 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   ScrollView,
-  Image,
-  Alert,
-  Linking,
+  RefreshControl,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BoardPost, BoardTag } from '../types';
@@ -19,19 +17,25 @@ import { BoardCard } from './BoardCard';
 interface BoardTabProps {
   posts: BoardPost[];
   searchQuery: string;
+  likedPostIds?: string[];
   onLikeToggle?: (postId: string) => void;
   onOpenAddPost: () => void;
   savedPostIds?: string[];
   onToggleSavePost?: (postId: string) => void;
+  isRefreshing?: boolean;
+  onRefresh?: () => void;
 }
 
 export const BoardTab: React.FC<BoardTabProps> = ({
   posts,
   searchQuery,
+  likedPostIds = [],
   onLikeToggle,
   onOpenAddPost,
   savedPostIds = [],
   onToggleSavePost,
+  isRefreshing = false,
+  onRefresh,
 }) => {
   const [selectedTag, setSelectedTag] = useState<'all' | BoardTag>('all');
 
@@ -113,11 +117,22 @@ export const BoardTab: React.FC<BoardTabProps> = ({
         renderItem={({ item }) => (
           <BoardCard
             post={item}
+            isLiked={likedPostIds.includes(item.id)}
             onLikeToggle={onLikeToggle}
             isSaved={savedPostIds.includes(item.id)}
             onToggleSave={onToggleSavePost}
           />
         )}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              tintColor={THEME.primary}
+              colors={[THEME.primary]}
+            />
+          ) : undefined
+        }
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
@@ -143,7 +158,7 @@ export const BoardTab: React.FC<BoardTabProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'transparent',
   },
   tagsContainer: {
     backgroundColor: '#FFFFFF',
@@ -186,8 +201,13 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
-    marginTop: 30,
+    padding: 32,
+    marginTop: 24,
+    marginHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    borderWidth: 1,
+    borderColor: 'rgba(209, 250, 229, 0.9)',
   },
   emptyTitle: {
     fontSize: 16,

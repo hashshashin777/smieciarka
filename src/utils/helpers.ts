@@ -1,4 +1,4 @@
-import { Linking, Platform } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 
 export function calculateDistance(
   lat1: number,
@@ -26,16 +26,17 @@ export function calculateDistance(
 }
 
 export function formatRelativeTime(dateIso: string): string {
-  const now = new Date().getTime();
   const date = new Date(dateIso).getTime();
-  const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+  if (!Number.isFinite(date)) {
+    return 'Przed chwilą';
+  }
+  const now = Date.now();
+  const diffInMinutes = Math.max(0, Math.floor((now - date) / (1000 * 60)));
 
   if (diffInMinutes < 1) return 'Przed chwilą';
   if (diffInMinutes < 60) return `${diffInMinutes} min temu`;
   const diffInHours = Math.floor(diffInMinutes / 60);
   if (diffInHours < 24) {
-    if (diffInHours === 1) return '1 godz. temu';
-    if (diffInHours < 5) return `${diffInHours} godz. temu`;
     return `${diffInHours} godz. temu`;
   }
   const diffInDays = Math.floor(diffInHours / 24);
@@ -43,22 +44,44 @@ export function formatRelativeTime(dateIso: string): string {
   return `${diffInDays} dni temu`;
 }
 
-export function openNavigation(latitude: number, longitude: number, label: string) {
+export async function safeOpenUrl(
+  url: string,
+  errorTitle = 'Nie można otworzyć linku',
+  errorBody = 'Sprawdź, czy masz zainstalowaną przeglądarkę lub odpowiednią aplikację.'
+): Promise<boolean> {
+  try {
+    const supported = await Linking.canOpenURL(url);
+    if (!supported) {
+      Alert.alert(errorTitle, errorBody);
+      return false;
+    }
+    await Linking.openURL(url);
+    return true;
+  } catch {
+    Alert.alert(errorTitle, errorBody);
+    return false;
+  }
+}
+
+export async function openNavigation(
+  latitude: number,
+  longitude: number,
+  label: string
+): Promise<void> {
+  const encodedLabel = encodeURIComponent(label || 'Znalezisko');
   const scheme = Platform.select({
-    ios: `maps:0,0?q=${encodeURIComponent(label)}@${latitude},${longitude}`,
-    android: `geo:0,0?q=${latitude},${longitude}(${encodeURIComponent(label)})`,
+    ios: `maps:0,0?q=${encodedLabel}@${latitude},${longitude}`,
+    android: `geo:${latitude},${longitude}?q=${latitude},${longitude}(${encodedLabel})`,
   });
   const webFallback = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
 
-  if (scheme) {
-    Linking.canOpenURL(scheme).then((supported) => {
-      if (supported) {
-        Linking.openURL(scheme);
-      } else {
-        Linking.openURL(webFallback);
-      }
-    }).catch(() => Linking.openURL(webFallback));
-  } else {
-    Linking.openURL(webFallback);
+  try {
+    if (scheme && (await Linking.canOpenURL(scheme))) {
+      await Linking.openURL(scheme);
+      return;
+    }
+    await Linking.openURL(webFallback);
+  } catch {
+    Alert.alert('Brak aplikacji map', 'Nie udało się uruchomić nawigacji dla tych współrzędnych.');
   }
 }

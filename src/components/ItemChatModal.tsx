@@ -5,13 +5,13 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  SafeAreaView,
   FlatList,
   TextInput,
   KeyboardAvoidingView,
   Platform,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { THEME, APP_FONT } from '../constants/categories';
 import { PostItem, UserProfile, ItemMessage } from '../types';
@@ -22,8 +22,17 @@ interface ItemChatModalProps {
   onClose: () => void;
   item: PostItem | null;
   currentUser: UserProfile | null;
+  accountsEnabled?: boolean;
   onOpenLogin: () => void;
 }
+
+const GUEST_CHAT_PROFILE: UserProfile = {
+  id: 'guest-local',
+  name: 'Sąsiad',
+  email: '',
+  provider: 'email',
+  createdAt: new Date().toISOString(),
+};
 
 const QUICK_SUGGESTIONS = [
   'Cześć! Czy to jeszcze stoi? 👀',
@@ -37,6 +46,7 @@ export const ItemChatModal: React.FC<ItemChatModalProps> = ({
   onClose,
   item,
   currentUser,
+  accountsEnabled = true,
   onOpenLogin,
 }) => {
   const [messages, setMessages] = useState<ItemMessage[]>([]);
@@ -44,9 +54,15 @@ export const ItemChatModal: React.FC<ItemChatModalProps> = ({
   const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     if (visible && item) {
-      AuthService.getItemMessages(item.id).then((msgs) => setMessages(msgs));
+      AuthService.getItemMessages(item.id).then((msgs) => {
+        if (isMounted) setMessages(msgs);
+      });
     }
+    return () => {
+      isMounted = false;
+    };
   }, [visible, item]);
 
   if (!item) return null;
@@ -55,7 +71,7 @@ export const ItemChatModal: React.FC<ItemChatModalProps> = ({
     const text = (textToSend || inputText).trim();
     if (!text) return;
 
-    if (!currentUser) {
+    if (accountsEnabled && !currentUser) {
       Alert.alert(
         'Wymagane logowanie 💬',
         'Aby wysyłać wiadomości do znalazców i sąsiadów, zaloguj się przez Apple, Google lub Facebook.',
@@ -67,9 +83,10 @@ export const ItemChatModal: React.FC<ItemChatModalProps> = ({
       return;
     }
 
+    const senderProfile = currentUser ?? GUEST_CHAT_PROFILE;
     setIsSending(true);
     try {
-      const newMsg = await AuthService.sendItemMessage(item.id, item.title, text, currentUser);
+      const newMsg = await AuthService.sendItemMessage(item.id, item.title, text, senderProfile);
       setMessages((prev) => [...prev, newMsg]);
       setInputText('');
     } catch {
@@ -84,7 +101,7 @@ export const ItemChatModal: React.FC<ItemChatModalProps> = ({
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
         >
           {/* Header */}
@@ -153,7 +170,8 @@ export const ItemChatModal: React.FC<ItemChatModalProps> = ({
               {QUICK_SUGGESTIONS.map((suggestion, idx) => (
                 <TouchableOpacity
                   key={idx}
-                  style={styles.suggestionPill}
+                  style={[styles.suggestionPill, isSending && { opacity: 0.5 }]}
+                  disabled={isSending}
                   onPress={() => handleSendMessage(suggestion)}
                   activeOpacity={0.8}
                 >
@@ -167,7 +185,11 @@ export const ItemChatModal: React.FC<ItemChatModalProps> = ({
           <View style={styles.inputBar}>
             <TextInput
               style={styles.textInput}
-              placeholder={currentUser ? 'Napisz wiadomość o wystawce...' : 'Zaloguj się, aby napisać wiadomość...'}
+              placeholder={
+                !accountsEnabled || currentUser
+                  ? 'Napisz wiadomość o wystawce...'
+                  : 'Zaloguj się, aby napisać wiadomość...'
+              }
               placeholderTextColor="#94A3B8"
               value={inputText}
               onChangeText={setInputText}

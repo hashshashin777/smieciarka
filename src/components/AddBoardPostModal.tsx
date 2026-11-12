@@ -7,11 +7,11 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BoardPost, BoardTag } from '../types';
 import { BOARD_TAGS } from '../constants/boardTags';
@@ -72,13 +72,18 @@ export const AddBoardPostModal: React.FC<AddBoardPostModalProps> = ({
     Alert.alert('Opublikowano! 📌', 'Twoje ogłoszenie pojawiło się na tablicy społeczności.');
   };
 
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           {/* Top Bar */}
           <View style={styles.topBar}>
-            <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
+            <TouchableOpacity onPress={handleClose} style={styles.cancelBtn}>
               <Text style={styles.cancelBtnText}>Anuluj</Text>
             </TouchableOpacity>
             <Text style={styles.topBarTitle}>Nowy wpis na tablicy</Text>

@@ -1,12 +1,12 @@
 export type ItemType = 'wystawka' | 'oddam';
 
-export type ItemCategory = 
-  | 'meble' 
-  | 'elektronika' 
-  | 'agd' 
-  | 'ksiazki' 
-  | 'ubrania' 
-  | 'rosliny' 
+export type ItemCategory =
+  | 'meble'
+  | 'elektronika'
+  | 'agd'
+  | 'ksiazki'
+  | 'ubrania'
+  | 'rosliny'
   | 'dla_dzieci'
   | 'inne';
 
@@ -77,6 +77,7 @@ export interface UserProfile {
   email: string;
   provider: AuthProvider;
   avatarUrl?: string;
+  role?: 'user' | 'admin';
   createdAt: string;
 }
 
@@ -91,3 +92,35 @@ export interface ItemMessage {
   createdAt: string;
   isMyMessage?: boolean;
 }
+
+export type SyncAction =
+  | {
+      id: string;
+      kind: 'insert_item';
+      payload: PostItem;
+      createdAt: string;
+    }
+  | {
+      id: string;
+      kind: 'vote_still_there';
+      itemId: string;
+      createdAt: string;
+    }
+  | {
+      id: string;
+      kind: 'vote_taken';
+      itemId: string;
+      createdAt: string;
+    }
+  | {
+      id: string;
+      kind: 'insert_board_post';
+      payload: BoardPost;
+      createdAt: string;
+    }
+  | {
+      id: string;
+      kind: 'toggle_board_like';
+      postId: string;
+      createdAt: string;
+    };

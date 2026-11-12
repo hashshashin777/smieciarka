@@ -14,13 +14,14 @@ interface ItemCardProps {
   onToggleSave?: () => void;
 }
 
-export const ItemCard = React.memo<ItemCardProps>(({
+const ItemCardComponent: React.FC<ItemCardProps> = ({
   item,
   userCoords,
   onPress,
   isSaved = false,
   onToggleSave,
 }) => {
+  const [imageError, setImageError] = React.useState(false);
   const categoryMeta = CATEGORIES.find((c) => c.id === item.category) || CATEGORIES[CATEGORIES.length - 1];
   
   const distance = userCoords 
@@ -39,8 +40,13 @@ export const ItemCard = React.memo<ItemCardProps>(({
     >
       {/* Photo */}
       <View style={styles.imageContainer}>
-        {item.photos && item.photos.length > 0 ? (
-          <Image source={{ uri: item.photos[0] }} style={styles.image} resizeMode="cover" />
+        {item.photos && item.photos.length > 0 && !imageError ? (
+          <Image
+            source={{ uri: item.photos[0] }}
+            style={styles.image}
+            resizeMode="cover"
+            onError={() => setImageError(true)}
+          />
         ) : (
           <View style={styles.placeholderImage}>
             <MaterialCommunityIcons name="image-off-outline" size={32} color="#94A3B8" />
@@ -67,7 +73,7 @@ export const ItemCard = React.memo<ItemCardProps>(({
             activeOpacity={0.8}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel={isSaved ? "Usuń z zapisanych" : "Zapisz ogłoszenie do ulubionych"}
+            accessibilityLabel={isSaved ? 'Usuń z zapisanych' : 'Zapisz ogłoszenie do ulubionych'}
           >
             <MaterialCommunityIcons
               name={isSaved ? 'star' : 'star-outline'}
@@ -121,7 +127,7 @@ export const ItemCard = React.memo<ItemCardProps>(({
             </Text>
           </View>
 
-          {item.takenVotes === 1 && (
+          {item.takenVotes >= 1 && (
             <View style={styles.takenWarningBadge}>
               <MaterialCommunityIcons name="alert-circle-outline" size={12} color="#B45309" />
               <Text style={styles.takenWarningBadgeText}>Może być zabrane (1/2)</Text>
@@ -141,7 +147,10 @@ export const ItemCard = React.memo<ItemCardProps>(({
       </LinearGradient>
     </TouchableOpacity>
   );
-});
+};
+
+export const ItemCard = React.memo(ItemCardComponent);
+ItemCard.displayName = 'ItemCard';
 
 const styles = StyleSheet.create({
   card: {
@@ -197,13 +206,6 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.oddam,
   },
   typeBadgeText: {
-    fontFamily: APP_FONT,
-    color: '#FFFFFF',
-    fontSize: 10.5,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  typeBadgeTextOddam: {
     fontFamily: APP_FONT,
     color: '#FFFFFF',
     fontSize: 10.5,

@@ -10,8 +10,9 @@ import {
   ScrollView,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
-import { THEME, APP_FONT } from '../constants/categories';
+import { APP_FONT } from '../constants/categories';
 import {
   NeighborhoodSettings,
   NeighborhoodScope,
@@ -46,17 +47,16 @@ export const NeighborhoodModal: React.FC<NeighborhoodModalProps> = ({
   onSaveSettings,
   itemsInRadiusCount = 0,
 }) => {
+  const insets = useSafeAreaInsets();
   const [radius, setRadius] = React.useState(clampNeighborhoodRadius(settings.radiusKm));
   const [scope, setScope] = React.useState<NeighborhoodScope>(getNeighborhoodScope(settings));
   const [alerts, setAlerts] = React.useState(settings.alertsEnabled);
 
-  React.useEffect(() => {
-    if (visible) {
-      setRadius(clampNeighborhoodRadius(settings.radiusKm));
-      setScope(getNeighborhoodScope(settings));
-      setAlerts(settings.alertsEnabled);
-    }
-  }, [visible, settings]);
+  const syncFromSettings = React.useCallback(() => {
+    setRadius(clampNeighborhoodRadius(settings.radiusKm));
+    setScope(getNeighborhoodScope(settings));
+    setAlerts(settings.alertsEnabled);
+  }, [settings]);
 
   const handleSave = () => {
     const nextSettings: NeighborhoodSettings = {
@@ -89,9 +89,9 @@ export const NeighborhoodModal: React.FC<NeighborhoodModalProps> = ({
   });
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onShow={syncFromSettings} onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.sheetContainer}>
+        <View style={[styles.sheetContainer, { paddingBottom: Math.max(24, insets.bottom + 12) }]}>
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerTitleRow}>
@@ -186,7 +186,7 @@ export const NeighborhoodModal: React.FC<NeighborhoodModalProps> = ({
                         {opt.label}
                       </Text>
                       <Text style={[styles.scopeCardSub, isSelected && styles.radiusSubSelected]}>
-                        {opt.sub}
+                        {opt.subtitle}
                       </Text>
                     </View>
                     {isSelected && (

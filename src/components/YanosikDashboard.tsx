@@ -13,7 +13,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PostItem, ItemType, UserProfile } from '../types';
-import { THEME, GRADIENTS, APP_FONT } from '../constants/categories';
+import { THEME, APP_FONT } from '../constants/categories';
+import { CustomBannerImages, resolveBannerSource } from '../constants/banners';
+import { CityOption, getCityDisplayLabel } from '../constants/cities';
+import { calculateDistance } from '../utils/helpers';
 import { EcoImpactCard } from './EcoImpactCard';
 import {
   EcoStats,
@@ -48,8 +51,9 @@ interface YanosikDashboardProps {
   neighborhoodSettings?: NeighborhoodSettings;
   onOpenNeighborhoodModal?: () => void;
   onChangeRadius?: (newRadius: number) => void;
-  onSelectNeighborhoodScope?: (scope: Exclude<NeighborhoodScope, 'radius'>) => void;
+  onSelectNeighborhoodScope?: (scope: NeighborhoodScope) => void;
   currentUser?: UserProfile | null;
+  showAuthControls?: boolean;
   onOpenLogin?: () => void;
   onSignOut?: () => void;
   isDark?: boolean;
@@ -57,6 +61,13 @@ interface YanosikDashboardProps {
   onNextTutorialStep?: () => void;
   onDismissTutorial?: () => void;
   onRestartTutorial?: () => void;
+  selectedCity?: CityOption | null;
+  gpsCityName?: string | null;
+  onOpenCityPicker?: () => void;
+  userCoords?: { latitude: number; longitude: number } | null;
+  adsEnabled?: boolean;
+  customBanners?: CustomBannerImages;
+  onOpenAdmin?: () => void;
 }
 
 export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
@@ -80,6 +91,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
   onChangeRadius,
   onSelectNeighborhoodScope,
   currentUser,
+  showAuthControls = true,
   onOpenLogin,
   onSignOut,
   isDark: _isDark = false,
@@ -87,6 +99,13 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
   onNextTutorialStep,
   onDismissTutorial,
   onRestartTutorial,
+  selectedCity = null,
+  gpsCityName = null,
+  onOpenCityPicker,
+  userCoords = null,
+  adsEnabled = true,
+  customBanners,
+  onOpenAdmin,
 }) => {
   // Pulpit jest zawsze w jasnym motywie (Light Mode)
   const isDark = false;
@@ -119,14 +138,53 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* 0. PASEK STATUSU KONTA / TRYBU GOŚĆ */}
-        <LinearGradient
-          colors={isDark ? ['#132425', '#0A1516'] : ['#FFFFFF', '#F2FAF7']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.authStatusBar, isDark && styles.authStatusBarDark]}
-        >
-          {currentUser ? (
+        {/* 0. PASEK STATUSU KONTA / GÓRNY PASEK PULPITU */}
+        {(showAuthControls || onRestartTutorial || onOpenAdmin) && (
+          <LinearGradient
+            colors={isDark ? ['#132425', '#0A1516'] : ['#FFFFFF', '#F2FAF7']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.authStatusBar, isDark && styles.authStatusBarDark]}
+          >
+            {!showAuthControls ? (
+              <View style={styles.authStatusLeft}>
+                <View style={styles.guestStatusIcon}>
+                  <MaterialCommunityIcons name="recycle" size={20} color="#059669" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.guestStatusTitle, isDark && styles.textWhite]}>
+                    Śmieciarka • Zero-Waste
+                  </Text>
+                  <Text style={styles.guestStatusSub}>
+                    Przeglądaj wystawki i oddawaj za darmo
+                  </Text>
+                </View>
+                <View style={styles.topHeaderActions}>
+                  {onRestartTutorial && (
+                    <TouchableOpacity
+                      style={[styles.tutorialLauncherBtn, { marginRight: 0 }]}
+                      onPress={onRestartTutorial}
+                      activeOpacity={0.8}
+                    >
+                      <MaterialCommunityIcons name="school-outline" size={13} color="#059669" />
+                      <Text style={styles.tutorialLauncherText}>Samouczek</Text>
+                    </TouchableOpacity>
+                  )}
+                  {onOpenAdmin && (
+                    <TouchableOpacity
+                      style={styles.adminLauncherBtn}
+                      onPress={onOpenAdmin}
+                      activeOpacity={0.8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Otwórz panel administratora"
+                    >
+                      <MaterialCommunityIcons name="shield-crown-outline" size={14} color="#FFFFFF" />
+                      <Text style={styles.adminLauncherText}>Admin</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            ) : currentUser ? (
             <View style={styles.authStatusLeft}>
               {currentUser.avatarUrl ? (
                 <Image source={{ uri: currentUser.avatarUrl }} style={styles.userAvatarImage} />
@@ -179,6 +237,18 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                   <Text style={styles.tutorialLauncherText}>Samouczek</Text>
                 </TouchableOpacity>
               )}
+              {onOpenAdmin && (
+                <TouchableOpacity
+                  style={styles.adminLauncherBtn}
+                  onPress={onOpenAdmin}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Otwórz panel administratora"
+                >
+                  <MaterialCommunityIcons name="shield-crown-outline" size={14} color="#FFFFFF" />
+                  <Text style={styles.adminLauncherText}>Admin</Text>
+                </TouchableOpacity>
+              )}
               {onSignOut && (
                 <TouchableOpacity
                   style={styles.signOutBtn}
@@ -204,6 +274,16 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                 </Text>
                 <Text style={styles.guestStatusSub}>Zaloguj przez Apple/Google, aby pisać wiadomości</Text>
               </View>
+              {onOpenAdmin && (
+                <TouchableOpacity
+                  style={styles.adminLauncherBtn}
+                  onPress={onOpenAdmin}
+                  activeOpacity={0.8}
+                >
+                  <MaterialCommunityIcons name="shield-crown-outline" size={14} color="#FFFFFF" />
+                  <Text style={styles.adminLauncherText}>Admin</Text>
+                </TouchableOpacity>
+              )}
               {onRestartTutorial && (
                 <TouchableOpacity
                   style={styles.tutorialLauncherBtn}
@@ -223,27 +303,30 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                 <Text style={styles.loginPillText}>Zaloguj</Text>
               </LinearGradient>
             </TouchableOpacity>
-          )}
-        </LinearGradient>
+            )}
+          </LinearGradient>
+        )}
 
         {/* BANER REKLAMOWY (Własna grafika z zaokrąglonymi brzegami) */}
-        <TouchableOpacity
-          style={styles.adBannerCard}
-          activeOpacity={0.9}
-          onPress={() =>
-            Alert.alert(
-              'Daj przedmiotom drugie życie! 🚛💚',
-              'Wystawki i rzeczy do oddania za darmo w Twojej okolicy!\n\nAplikacja dostępna na Android i iOS.',
-              [{ text: 'Super!', style: 'default' }]
-            )
-          }
-        >
-          <Image
-            source={require('../assets/ad_banner.webp')}
-            style={styles.adBannerImage}
-            resizeMode="cover"
-          />
-        </TouchableOpacity>
+        {adsEnabled && (
+          <TouchableOpacity
+            style={styles.adBannerCard}
+            activeOpacity={0.9}
+            onPress={() =>
+              Alert.alert(
+                'Daj przedmiotom drugie życie! 🚛💚',
+                'Wystawki i rzeczy do oddania za darmo w Twojej okolicy!\n\nAplikacja dostępna na Android i iOS.',
+                [{ text: 'Super!', style: 'default' }]
+              )
+            }
+          >
+            <Image
+              source={resolveBannerSource('home', customBanners)}
+              style={styles.adBannerImage}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
+        )}
 
         {/* 1. DUŻY SEARCH BAR ("Czego szukasz w okolicy?") */}
         <View style={[styles.searchBarCard, tutorialStepIndex === 1 && styles.highlightedCard]}>
@@ -256,13 +339,15 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
             onChangeText={onSearchChange}
             returnKeyType="search"
           />
-          {searchQuery.length > 0 ? (
-            <TouchableOpacity onPress={() => onSearchChange('')} style={{ padding: 4 }}>
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => onSearchChange('')}
+              style={{ padding: 6 }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Wyczyść wyszukiwanie"
+            >
               <MaterialCommunityIcons name="close-circle" size={22} color="#94A3B8" />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={styles.micBtn} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="microphone" size={24} color="#475569" />
             </TouchableOpacity>
           )}
         </View>
@@ -278,8 +363,8 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
           </View>
         )}
 
-        {/* 2. PASEK MÓJ REWIR (Geofencing & Alerty sąsiedzkie ze zintegrowanym suwakiem) */}
-        {onOpenNeighborhoodModal && (
+        {/* 2. PASEK MÓJ REWIR & WYBÓR MIASTA (Geofencing, Miasto & Alerty sąsiedzkie) */}
+        {(onOpenNeighborhoodModal || onOpenCityPicker) && (
           <View style={tutorialStepIndex === 2 && styles.highlightedCardWrapper}>
             <LinearGradient
               colors={isDark ? ['#132E2F', '#0B1B1C'] : ['#FFFFFF', '#EEFAF5']}
@@ -309,22 +394,51 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                   </View>
                 </View>
 
-                <TouchableOpacity 
-                  style={[styles.rewirAlertBadge, neighborhoodSettings.alertsEnabled ? styles.rewirAlertOn : styles.rewirAlertOff]}
-                  onPress={onOpenNeighborhoodModal}
-                  activeOpacity={0.8}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <MaterialCommunityIcons 
-                    name={neighborhoodSettings.alertsEnabled ? 'bell-ring' : 'bell-off'} 
-                    size={14} 
-                    color={neighborhoodSettings.alertsEnabled ? '#047857' : '#94A3B8'} 
-                  />
-                  <Text style={[styles.rewirAlertText, neighborhoodSettings.alertsEnabled ? styles.rewirAlertTextOn : styles.rewirAlertTextOff]}>
-                    {neighborhoodSettings.alertsEnabled ? 'Alerty WŁ.' : 'WYŁ.'}
-                  </Text>
-                </TouchableOpacity>
+                {onOpenNeighborhoodModal && (
+                  <TouchableOpacity
+                    style={[styles.rewirAlertBadge, neighborhoodSettings.alertsEnabled ? styles.rewirAlertOn : styles.rewirAlertOff]}
+                    onPress={onOpenNeighborhoodModal}
+                    activeOpacity={0.8}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <MaterialCommunityIcons
+                      name={neighborhoodSettings.alertsEnabled ? 'bell-ring' : 'bell-off'}
+                      size={14}
+                      color={neighborhoodSettings.alertsEnabled ? '#047857' : '#94A3B8'}
+                    />
+                    <Text style={[styles.rewirAlertText, neighborhoodSettings.alertsEnabled ? styles.rewirAlertTextOn : styles.rewirAlertTextOff]}>
+                      {neighborhoodSettings.alertsEnabled ? 'Alerty WŁ.' : 'WYŁ.'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
+
+              {/* Zintegrowany wybór miasta w module Mój rewir */}
+              {onOpenCityPicker && (
+                <TouchableOpacity
+                  style={styles.rewirCityRow}
+                  onPress={onOpenCityPicker}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Wybrane miasto: ${getCityDisplayLabel(selectedCity, gpsCityName)}. Dotknij, aby zmienić miasto.`}
+                >
+                  <View style={styles.rewirCityLeft}>
+                    <MaterialCommunityIcons
+                      name={selectedCity ? 'city-variant-outline' : 'crosshairs-gps'}
+                      size={16}
+                      color="#059669"
+                    />
+                    <Text style={styles.rewirCityLabel}>Miasto:</Text>
+                    <Text style={styles.rewirCityValue} numberOfLines={1}>
+                      {getCityDisplayLabel(selectedCity, gpsCityName)}
+                    </Text>
+                  </View>
+                  <View style={styles.rewirCityAction}>
+                    <Text style={styles.rewirCityActionText}>Zmień</Text>
+                    <MaterialCommunityIcons name="chevron-down" size={16} color="#047857" />
+                  </View>
+                </TouchableOpacity>
+              )}
 
               {/* Suwak regulacji zasięgu (1 - 50 km) */}
               <View style={styles.sliderSection}>
@@ -403,7 +517,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                 <Text style={styles.plusText}>{wystawkaCount}</Text>
               </View>
               <View style={styles.tileIconContainer}>
-                <MaterialCommunityIcons name="dump-truck" size={28} color="#F59E0B" />
+                <MaterialCommunityIcons name="dump-truck" size={50} color="#F59E0B" />
               </View>
               <Text style={styles.tileLabel}>Wystawki</Text>
             </LinearGradient>
@@ -425,7 +539,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                 <Text style={[styles.plusText, { color: '#FFFFFF' }]}>{oddamCount}</Text>
               </View>
               <View style={styles.tileIconContainer}>
-                <MaterialCommunityIcons name="gift" size={28} color="#059669" />
+                <MaterialCommunityIcons name="gift" size={50} color="#059669" />
               </View>
               <Text style={styles.tileLabel}>Oddam</Text>
             </LinearGradient>
@@ -444,7 +558,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
               style={styles.gridTile}
             >
               <View style={styles.tileIconContainer}>
-                <MaterialCommunityIcons name="bulletin-board" size={28} color="#475569" />
+                <MaterialCommunityIcons name="bulletin-board" size={50} color="#475569" />
               </View>
               <Text style={styles.tileLabel}>Tablica</Text>
             </LinearGradient>
@@ -466,7 +580,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                 <Text style={[styles.plusText, { color: '#78350F' }]}>{savedCount}</Text>
               </View>
               <View style={styles.tileIconContainer}>
-                <MaterialCommunityIcons name="star" size={28} color={THEME.starYellow} />
+                <MaterialCommunityIcons name="star" size={50} color={THEME.starYellow} />
               </View>
               <Text style={styles.tileLabel}>Zapisane</Text>
             </LinearGradient>
@@ -540,7 +654,16 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
           </TouchableOpacity>
         </View>
 
-        {displayedItems.map((item, idx) => (
+        {displayedItems.map((item, idx) => {
+          const distance = userCoords
+            ? calculateDistance(
+                userCoords.latitude,
+                userCoords.longitude,
+                item.location.latitude,
+                item.location.longitude
+              )
+            : null;
+          return (
           <TouchableOpacity
             key={item.id}
             style={[styles.recentItemBannerWrapper, idx > 0 && { marginTop: 10 }]}
@@ -572,7 +695,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                       item.type === 'wystawka' ? { color: '#D97706' } : { color: '#047857' },
                     ]}
                   >
-                    {idx === 0 ? 'NAJNOWSZE ZNALEZISKO' : item.type === 'wystawka' ? 'WYSTAWKA W OKOLICY' : 'ODDAM ZA DARMO'}
+                    {idx === 0 ? 'NAJBLIŻSZE ZNALEZISKO' : item.type === 'wystawka' ? 'WYSTAWKA W OKOLICY' : 'ODDAM ZA DARMO'}
                   </Text>
                 </View>
                 <Text style={styles.recentItemTitle} numberOfLines={1}>
@@ -580,6 +703,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                 </Text>
                 <Text style={styles.recentItemSub} numberOfLines={1}>
                   {item.location.address || 'Sprawdź odległość'}
+                  {distance ? ` • ${distance.formatted}` : ''}
                 </Text>
               </View>
               <View style={styles.playArrowCircle}>
@@ -587,7 +711,8 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
               </View>
             </LinearGradient>
           </TouchableOpacity>
-        ))}
+          );
+        })}
         {displayedItems.length === 0 && (
           <View style={styles.emptyContainer}>
             <MaterialCommunityIcons name="file-search-outline" size={44} color="#94A3B8" />
@@ -615,7 +740,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6', // Jasnoszary, czysty odcień tła w stylu Yanosik
+    backgroundColor: 'transparent',
     position: 'relative',
   },
   scrollContent: {
@@ -769,11 +894,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     height: '100%',
   },
-  micBtn: {
-    padding: 6,
-  },
 
-  // 2. Mój Rewir
+  // 2. Mój Rewir (ze zintegrowanym wyborem miasta)
   rewirCard: {
     borderRadius: 18,
     paddingVertical: 14,
@@ -794,7 +916,56 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 10,
+  },
+  rewirCityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 11,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+  },
+  rewirCityLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    marginRight: 8,
+  },
+  rewirCityLabel: {
+    fontFamily: APP_FONT,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  rewirCityValue: {
+    flexShrink: 1,
+    fontFamily: APP_FONT,
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  rewirCityAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 9,
+  },
+  rewirCityActionText: {
+    fontFamily: APP_FONT,
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#047857',
   },
   rewirLeft: {
     flexDirection: 'row',
@@ -925,8 +1096,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   gridTileWrapper: {
-    width: '23%',
-    aspectRatio: 1,
+    width: '23.5%',
+    minHeight: 92,
     borderRadius: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -937,19 +1108,20 @@ const styles = StyleSheet.create({
   gridTile: {
     position: 'relative',
     width: '100%',
-    height: '100%',
+    minHeight: 92,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    paddingVertical: 6,
+    paddingTop: 10,
+    paddingBottom: 8,
     paddingHorizontal: 2,
   },
   tileIconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   tileBadgePlus: {
     position: 'absolute',
@@ -1063,7 +1235,12 @@ const styles = StyleSheet.create({
     fontFamily: APP_FONT,
     fontSize: 12.5,
     fontWeight: '700',
-    color: '#059669',
+    color: '#047857',
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -1220,5 +1397,28 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#065F46',
+  },
+  topHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  adminLauncherBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#064E3B',
+    borderWidth: 1,
+    borderColor: '#047857',
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    borderRadius: 20,
+    marginRight: 4,
+  },
+  adminLauncherText: {
+    fontFamily: APP_FONT,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FDE68A',
   },
 });
