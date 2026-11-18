@@ -56,7 +56,10 @@
               "pathPrefix": "/item"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -94,6 +97,12 @@
         }
       ],
       "./plugins/withAndroidQueries"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "738e24c1-7ede-4796-bdd8-8797d7b3d047"
+      }
+    },
+    "owner": "hashshashin"
   }
 }
