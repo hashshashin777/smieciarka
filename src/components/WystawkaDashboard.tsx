@@ -18,6 +18,7 @@ import { CustomBannerImages, resolveBannerSource } from '../constants/banners';
 import { CityOption, getCityDisplayLabel } from '../constants/cities';
 import { calculateDistance } from '../utils/helpers';
 import { EcoImpactCard } from './EcoImpactCard';
+import { AirQualityCard } from './AirQualityCard';
 import {
   EcoStats,
   NeighborhoodSettings,
@@ -32,7 +33,7 @@ import {
 import { TutorialTooltip } from './TutorialTooltip';
 import { TUTORIAL_STEPS } from '../constants/tutorialSteps';
 
-interface YanosikDashboardProps {
+interface WystawkaDashboardProps {
   searchQuery: string;
   onSearchChange: (text: string) => void;
   onOpenMap: () => void;
@@ -67,10 +68,11 @@ interface YanosikDashboardProps {
   userCoords?: { latitude: number; longitude: number } | null;
   adsEnabled?: boolean;
   customBanners?: CustomBannerImages;
+  showOnlineBadge?: boolean;
   onOpenAdmin?: () => void;
 }
 
-export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
+export const WystawkaDashboard: React.FC<WystawkaDashboardProps> = ({
   searchQuery,
   onSearchChange,
   onOpenMap,
@@ -105,6 +107,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
   userCoords = null,
   adsEnabled = true,
   customBanners,
+  showOnlineBadge = true,
   onOpenAdmin,
 }) => {
   // Pulpit jest zawsze w jasnym motywie (Light Mode)
@@ -116,9 +119,15 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
     if (tutorialStepIndex === 1) {
       scrollRef.current?.scrollTo({ y: 0, animated: true });
     } else if (tutorialStepIndex === 2) {
-      scrollRef.current?.scrollTo({ y: 130, animated: true });
+      scrollRef.current?.scrollTo({ y: 110, animated: true });
     } else if (tutorialStepIndex === 3) {
       scrollRef.current?.scrollTo({ y: 260, animated: true });
+    } else if (tutorialStepIndex === 4) {
+      scrollRef.current?.scrollTo({ y: 440, animated: true });
+    } else if (tutorialStepIndex === 5) {
+      scrollRef.current?.scrollTo({ y: 560, animated: true });
+    } else if (tutorialStepIndex === 6) {
+      scrollRef.current?.scrollTo({ y: 780, animated: true });
     }
   }, [tutorialStepIndex]);
 
@@ -153,7 +162,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.guestStatusTitle, isDark && styles.textWhite]}>
-                    Śmieciarka • Zero-Waste
+                    Wystawka • Zero-Waste
                   </Text>
                   <Text style={styles.guestStatusSub}>
                     Przeglądaj wystawki i oddawaj za darmo
@@ -168,18 +177,6 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                     >
                       <MaterialCommunityIcons name="school-outline" size={13} color="#059669" />
                       <Text style={styles.tutorialLauncherText}>Samouczek</Text>
-                    </TouchableOpacity>
-                  )}
-                  {onOpenAdmin && (
-                    <TouchableOpacity
-                      style={styles.adminLauncherBtn}
-                      onPress={onOpenAdmin}
-                      activeOpacity={0.8}
-                      accessibilityRole="button"
-                      accessibilityLabel="Otwórz panel administratora"
-                    >
-                      <MaterialCommunityIcons name="shield-crown-outline" size={14} color="#FFFFFF" />
-                      <Text style={styles.adminLauncherText}>Admin</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -237,18 +234,6 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                   <Text style={styles.tutorialLauncherText}>Samouczek</Text>
                 </TouchableOpacity>
               )}
-              {onOpenAdmin && (
-                <TouchableOpacity
-                  style={styles.adminLauncherBtn}
-                  onPress={onOpenAdmin}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel="Otwórz panel administratora"
-                >
-                  <MaterialCommunityIcons name="shield-crown-outline" size={14} color="#FFFFFF" />
-                  <Text style={styles.adminLauncherText}>Admin</Text>
-                </TouchableOpacity>
-              )}
               {onSignOut && (
                 <TouchableOpacity
                   style={styles.signOutBtn}
@@ -274,16 +259,6 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
                 </Text>
                 <Text style={styles.guestStatusSub}>Zaloguj przez Apple/Google, aby pisać wiadomości</Text>
               </View>
-              {onOpenAdmin && (
-                <TouchableOpacity
-                  style={styles.adminLauncherBtn}
-                  onPress={onOpenAdmin}
-                  activeOpacity={0.8}
-                >
-                  <MaterialCommunityIcons name="shield-crown-outline" size={14} color="#FFFFFF" />
-                  <Text style={styles.adminLauncherText}>Admin</Text>
-                </TouchableOpacity>
-              )}
               {onRestartTutorial && (
                 <TouchableOpacity
                   style={styles.tutorialLauncherBtn}
@@ -337,6 +312,12 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
             placeholderTextColor="#94A3B8"
             value={searchQuery}
             onChangeText={onSearchChange}
+            onSubmitEditing={() => {
+              if (searchQuery.trim().toLowerCase() === '#admin') {
+                onSearchChange('');
+                onOpenAdmin?.();
+              }
+            }}
             returnKeyType="search"
           />
           {searchQuery.length > 0 && (
@@ -500,7 +481,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
         )}
 
         {/* 3. 4 KAFELKI SKRÓTÓW (Wystawki / Oddam / Tablica / Zapisane z gradientem) */}
-        <View style={styles.quickGridRow}>
+        <View style={[styles.quickGridRow, tutorialStepIndex === 3 && styles.highlightedCard]}>
           {/* Kafelek 1: Wystawki */}
           <TouchableOpacity
             style={styles.gridTileWrapper}
@@ -587,6 +568,17 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
           </TouchableOpacity>
         </View>
 
+        {/* Chmurka samouczka - Krok 4 (Kafelki szybkiego dostępu) */}
+        {tutorialStepIndex === 3 && (
+          <View style={styles.tutorialTooltipWrapper}>
+            <TutorialTooltip
+              {...TUTORIAL_STEPS[3]}
+              onNext={() => onNextTutorialStep?.()}
+              onDismiss={() => onDismissTutorial?.()}
+            />
+          </View>
+        )}
+
         {/* 4. DWA KAFELKI AKCJI (Ostatnie znaleziska + Mapa Otwórz nawigację) */}
         <View style={styles.splitCardsRow}>
           {/* Lewy kafelek: Ostatnie znaleziska (biały z gradientem) */}
@@ -611,7 +603,7 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
 
           {/* Prawy kafelek: Mapa (Zieleń i delikatny gradient jak button aparatu) */}
           <TouchableOpacity
-            style={[styles.splitCardWrapper, tutorialStepIndex === 3 && styles.highlightedSplitCard]}
+            style={[styles.splitCardWrapper, tutorialStepIndex === 4 && styles.highlightedSplitCard]}
             onPress={onOpenMap}
             activeOpacity={0.85}
           >
@@ -630,11 +622,11 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Chmurka samouczka - Krok 4 (Mapa) */}
-        {tutorialStepIndex === 3 && (
+        {/* Chmurka samouczka - Krok 5 (Mapa) */}
+        {tutorialStepIndex === 4 && (
           <View style={styles.tutorialTooltipWrapper}>
             <TutorialTooltip
-              {...TUTORIAL_STEPS[3]}
+              {...TUTORIAL_STEPS[4]}
               onNext={() => onNextTutorialStep?.()}
               onDismiss={() => onDismissTutorial?.()}
             />
@@ -642,7 +634,40 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
         )}
 
         {/* 5. TWÓJ WPŁYW ZERO-WASTE */}
-        <EcoImpactCard stats={ecoStats} streakDays={streakDays} isDark={isDark} />
+        <View style={tutorialStepIndex === 5 && styles.highlightedCard}>
+          <EcoImpactCard stats={ecoStats} streakDays={streakDays} isDark={isDark} />
+        </View>
+
+        {/* Chmurka samouczka - Krok 6 (Zero-Waste & Seria) */}
+        {tutorialStepIndex === 5 && (
+          <View style={styles.tutorialTooltipWrapper}>
+            <TutorialTooltip
+              {...TUTORIAL_STEPS[5]}
+              onNext={() => onNextTutorialStep?.()}
+              onDismiss={() => onDismissTutorial?.()}
+            />
+          </View>
+        )}
+
+        {/* MODUŁ: CZYSTE POWIETRZE (GPS na żywo) */}
+        <View style={tutorialStepIndex === 6 && styles.highlightedCard}>
+          <AirQualityCard
+            userCoords={userCoords}
+            locationName={selectedCity ? getCityDisplayLabel(selectedCity) : gpsCityName}
+            isDark={isDark}
+          />
+        </View>
+
+        {/* Chmurka samouczka - Krok 7 (Czyste Powietrze) */}
+        {tutorialStepIndex === 6 && (
+          <View style={styles.tutorialTooltipWrapper}>
+            <TutorialTooltip
+              {...TUTORIAL_STEPS[6]}
+              onNext={() => onNextTutorialStep?.()}
+              onDismiss={() => onDismissTutorial?.()}
+            />
+          </View>
+        )}
 
         {/* 6. ZNALEZISKA W OKOLICY (Wszystkie ogłoszenia z możliwością przewijania) */}
         <View style={styles.sectionHeaderRow}>
@@ -721,18 +746,30 @@ export const YanosikDashboard: React.FC<YanosikDashboardProps> = ({
         )}
       </ScrollView>
 
-      {/* 7. OKRĄGŁY PŁYWAJĄCY PRZYCISK SPOŁECZNOŚCI (Identyczny jak "290 K" w Yanosiku!) */}
-      <View style={styles.floatingCommunityBadge}>
-        <LinearGradient
-          colors={['#10B981', '#059669']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.floatingBadgeInner}
+      {/* 7. OKRĄGŁY PŁYWAJĄCY PRZYCISK SPOŁECZNOŚCI (Rzeczywista liczba online) */}
+      {showOnlineBadge && (
+        <TouchableOpacity
+          style={styles.floatingCommunityBadge}
+          activeOpacity={0.85}
+          onPress={() =>
+            Alert.alert(
+              'Społeczność na żywo 👥💚',
+              `W tej chwili ${usersCount} ${usersCount === 1 ? 'osoba jest teraz online w aplikacji' : usersCount < 5 ? 'osoby są teraz online w aplikacji' : 'osób jest teraz online w aplikacji'}.\n\nLicznik aktualizuje się automatycznie w czasie rzeczywistym!`,
+              [{ text: 'Super!', style: 'default' }]
+            )
+          }
         >
-          <MaterialCommunityIcons name="account-multiple" size={24} color="#FFFFFF" />
-          <Text style={[styles.floatingBadgeCount, { color: '#FFFFFF' }]}>{usersCount}</Text>
-        </LinearGradient>
-      </View>
+          <LinearGradient
+            colors={['#10B981', '#059669']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.floatingBadgeInner}
+          >
+            <MaterialCommunityIcons name="account-multiple" size={24} color="#FFFFFF" />
+            <Text style={[styles.floatingBadgeCount, { color: '#FFFFFF' }]}>{usersCount}</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -844,11 +881,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // Baner reklamowy (Własna grafika z zaokrąglonymi brzegami przeskalowana do 1080x341)
+  // Baner reklamowy (Własna grafika dopasowana do proporcji 1024x237)
   adBannerCard: {
     width: '100%',
-    aspectRatio: 1080 / 341,
-    backgroundColor: '#02242E',
+    aspectRatio: 1024 / 237,
+    backgroundColor: '#032C24',
     borderRadius: 18,
     marginBottom: 16,
     shadowColor: '#000',
@@ -857,7 +894,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 4,
     borderWidth: 1,
-    borderColor: '#063B4B',
+    borderColor: '#064E3B',
     overflow: 'hidden', // Gwarantuje idealnie zaokrąglone brzegi obrazka
     alignItems: 'center',
     justifyContent: 'center',

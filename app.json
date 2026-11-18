@@ -1,24 +1,34 @@
 {
   "expo": {
-    "name": "Śmieciarka",
-    "slug": "smieciarka",
-    "scheme": "smieciarka",
-    "description": "Śmieciarka – wystawki i rzeczy do oddania za darmo. Ratuj skarby z ulicy i dziel się z sąsiadami.",
+    "name": "Wystawka Zero-Waste",
+    "slug": "wystawka-zero-waste",
+    "scheme": "wystawka",
+    "description": "Wystawka Zero-Waste – wystawki i rzeczy do oddania za darmo. Ratuj skarby z ulicy i dziel się z sąsiadami.",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/welcome_splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#021E19"
+    },
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "fun.smieciarka.app",
+      "bundleIdentifier": "fun.wystawka.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Aplikacja Śmieciarka potrzebuje dostępu do aparatu, aby zrobić zdjęcie wystawki lub oddawanego przedmiotu.",
-        "NSPhotoLibraryUsageDescription": "Aplikacja Śmieciarka potrzebuje dostępu do galerii, aby dodać zdjęcie przedmiotu.",
-        "NSLocationWhenInUseUsageDescription": "Aplikacja Śmieciarka potrzebuje Twojej lokalizacji, aby pokazać wystawki w Twojej okolicy oraz oznaczyć lokalizację dodawanego przedmiotu."
+        "NSCameraUsageDescription": "Aplikacja Wystawka potrzebuje dostępu do aparatu, aby zrobić zdjęcie wystawki lub oddawanego przedmiotu.",
+        "NSPhotoLibraryUsageDescription": "Aplikacja Wystawka potrzebuje dostępu do galerii, aby dodać zdjęcie przedmiotu.",
+        "NSLocationWhenInUseUsageDescription": "Aplikacja Wystawka potrzebuje Twojej lokalizacji, aby pokazać wystawki w Twojej okolicy oraz oznaczyć lokalizację dodawanego przedmiotu."
       }
     },
     "android": {
-      "package": "fun.smieciarka.app",
+      "package": "fun.wystawka.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDXZyL8CHkddvAkJRT3VF4SnQJzYpN22LM"
+        }
+      },
       "adaptiveIcon": {
         "backgroundColor": "#10B981",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -38,11 +48,11 @@
           "autoVerify": true,
           "data": [
             {
-              "scheme": "smieciarka"
+              "scheme": "wystawka"
             },
             {
               "scheme": "https",
-              "host": "smieciarka.fun",
+              "host": "wystawka.fun",
               "pathPrefix": "/item"
             }
           ],
@@ -62,14 +72,14 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Aplikacja Śmieciarka potrzebuje Twojej lokalizacji, aby pokazać wystawki w okolicy i zapisać miejsce znaleziska."
+          "locationWhenInUsePermission": "Aplikacja Wystawka potrzebuje Twojej lokalizacji, aby pokazać wystawki w okolicy i zapisać miejsce znaleziska."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Aplikacja Śmieciarka potrzebuje dostępu do galerii, aby dodać zdjęcie przedmiotu.",
-          "cameraPermission": "Aplikacja Śmieciarka potrzebuje dostępu do aparatu, aby zrobić zdjęcie wystawki.",
+          "photosPermission": "Aplikacja Wystawka potrzebuje dostępu do galerii, aby dodać zdjęcie przedmiotu.",
+          "cameraPermission": "Aplikacja Wystawka potrzebuje dostępu do aparatu, aby zrobić zdjęcie wystawki.",
           "microphonePermission": false
         }
       ],

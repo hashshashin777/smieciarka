@@ -30,6 +30,8 @@ interface ItemDetailModalProps {
   currentUser?: UserProfile | null;
   accountsEnabled?: boolean;
   onOpenChat?: () => void;
+  onReportItem?: (item: PostItem, reason: string) => void;
+  onBlockAuthor?: (authorName: string) => void;
 }
 
 export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
@@ -44,6 +46,8 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   currentUser,
   accountsEnabled = true,
   onOpenChat,
+  onReportItem,
+  onBlockAuthor,
 }) => {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [isVoting, setIsVoting] = useState(false);
@@ -111,11 +115,46 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     );
   };
 
+  const handleReportMenu = () => {
+    Alert.alert(
+      'Zgłoś ogłoszenie lub zablokuj autora',
+      `Czy chcesz zgłosić to ogłoszenie lub zablokować użytkownika ${item.authorName || 'Anonim'}?`,
+      [
+        { text: 'Anuluj', style: 'cancel' },
+        {
+          text: 'Zgłoś niestosowną treść / spam',
+          style: 'destructive',
+          onPress: () => {
+            if (onReportItem) {
+              onReportItem(item, 'Niestosowna treść lub spam');
+            } else {
+              Alert.alert('Zgłoszenie przyjęte', 'Dziękujemy. Ogłoszenie zostało przekazane do moderacji i zostanie zweryfikowane w ciągu 24h.');
+            }
+          },
+        },
+        {
+          text: `Zablokuj autora (${item.authorName || 'użytkownika'})`,
+          style: 'destructive',
+          onPress: () => {
+            if (onBlockAuthor && item.authorName) {
+              onBlockAuthor(item.authorName);
+              Alert.alert('Zablokowano', `Użytkownik ${item.authorName} został zablokowany. Jego ogłoszenia nie będą się już wyświetlać.`);
+              onClose();
+            } else {
+              Alert.alert('Zablokowano', 'Użytkownik został zablokowany.');
+              onClose();
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleShare = async () => {
     try {
       await Share.share({
-        title: `Śmieciarka: ${item.title}`,
-        message: `Sprawdź to znalezisko na Śmieciarce: „${item.title}” w okolicy ${item.location.address || 'mapy'}! 🚛💚\n\nRatuj rzeczy przed śmietnikiem: https://smieciarka.fun/item/${item.id}`,
+        title: `Wystawka: ${item.title}`,
+        message: `Sprawdź to znalezisko na Wystawce: „${item.title}” w okolicy ${item.location.address || 'mapy'}! 🚛💚\n\nRatuj rzeczy przed śmietnikiem: https://wystawka.fun/item/${item.id}`,
       });
     } catch {
       Alert.alert('Nie udało się udostępnić', 'Spróbuj ponownie za chwilę.');
@@ -171,6 +210,15 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 />
               </TouchableOpacity>
             )}
+            <TouchableOpacity
+              onPress={handleReportMenu}
+              style={[styles.actionIconBtn, { marginLeft: 8 }]}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              accessibilityLabel="Zgłoś to ogłoszenie lub zablokuj autora"
+              accessibilityRole="button"
+            >
+              <MaterialCommunityIcons name="dots-vertical" size={22} color={THEME.text} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -372,6 +420,16 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 <Text style={styles.shareRowBtnText}>Udostępnij</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Dyskretny link zgłaszania na dole karty */}
+            <TouchableOpacity
+              style={styles.bottomReportLink}
+              onPress={handleReportMenu}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons name="flag-outline" size={14} color="#94A3B8" />
+              <Text style={styles.bottomReportLinkText}>Zgłoś naruszenie regulaminu lub spam</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -682,5 +740,20 @@ const styles = StyleSheet.create({
     color: THEME.primary,
     fontSize: 14,
     fontWeight: '700',
+  },
+  bottomReportLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    marginTop: 6,
+  },
+  bottomReportLinkText: {
+    fontFamily: APP_FONT,
+    fontSize: 12,
+    color: '#94A3B8',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });

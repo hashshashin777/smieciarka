@@ -141,7 +141,7 @@ export const EcoImpactCard: React.FC<EcoImpactCardProps> = ({
 
       {/* Licznik Dni z Rzędu (Nowy wariant graficzny + dzisiejszy dzień wg kalendarza) */}
       <LinearGradient
-        colors={isDark ? ['#0F2922', '#091815'] : ['#064E3B', '#047857']}
+        colors={isDark ? ['#0F2922', '#091815'] : ['#10B981', '#059669']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.streakContainer, isDark && styles.streakContainerDark]}

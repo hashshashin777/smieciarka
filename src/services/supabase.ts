@@ -447,3 +447,67 @@ export async function updateItemInCloud(
   if (error) return fail('NETWORK', STRINGS_PL.errors.network, error);
   return ok(undefined);
 }
+
+/**
+ * Subskrypcja obecności na żywo (Supabase Realtime Presence).
+ * Zlicza unikalnych użytkowników aktualnie połączonych z aplikacją w czasie rzeczywistym.
+ */
+export function subscribeToOnlinePresence(
+  onCountChange: (count: number) => void,
+  clientKey: string
+): () => void {
+  if (!supabase) {
+    onCountChange(1);
+    return () => {};
+  }
+
+  const presenceChannel = supabase.channel('online-presence', {
+    config: {
+      presence: {
+        key: clientKey,
+      },
+    },
+  });
+
+  const updateCount = () => {
+    try {
+      const state = presenceChannel.presenceState();
+      const distinctKeys = Object.keys(state);
+      const count = distinctKeys.length;
+      onCountChange(Math.max(1, count));
+    } catch {
+      onCountChange(1);
+    }
+  };
+
+  presenceChannel
+    .on('presence', { event: 'sync' }, () => {
+      updateCount();
+    })
+    .on('presence', { event: 'join' }, () => {
+      updateCount();
+    })
+    .on('presence', { event: 'leave' }, () => {
+      updateCount();
+    })
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        try {
+          await presenceChannel.track({
+            online_at: new Date().toISOString(),
+          });
+        } catch {
+          // Ignoruj błąd trackingu (np. offline)
+        }
+      }
+    });
+
+  return () => {
+    try {
+      presenceChannel.untrack().catch(() => {});
+    } catch {}
+    if (supabase) {
+      supabase.removeChannel(presenceChannel);
+    }
+  };
+}

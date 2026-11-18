@@ -28,9 +28,11 @@ export interface AdminSettings {
   accountsEnabled: boolean;
   adsEnabled: boolean;
   autoExpireEnabled: boolean;
+  autoExpireHours: number;
   bannerEnabled: boolean;
   bannerText: string;
   usersCount: number;
+  useRealOnlineUsers: boolean;
   customBanners: CustomBannerImages;
   blockedAuthors: string[];
 }
@@ -42,9 +44,11 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettings = {
   accountsEnabled: ACCOUNTS_ENABLED,
   adsEnabled: true,
   autoExpireEnabled: true,
+  autoExpireHours: 6,
   bannerEnabled: true,
   bannerText: DEFAULT_BETA_BANNER_TEXT,
-  usersCount: 128,
+  usersCount: 1,
+  useRealOnlineUsers: true,
   customBanners: {},
   blockedAuthors: [],
 };
@@ -489,6 +493,10 @@ export const StorageCache = {
             typeof parsed.autoExpireEnabled === 'boolean'
               ? parsed.autoExpireEnabled
               : DEFAULT_ADMIN_SETTINGS.autoExpireEnabled,
+          autoExpireHours:
+            typeof parsed.autoExpireHours === 'number' && parsed.autoExpireHours >= 1 && parsed.autoExpireHours <= 72
+              ? Math.round(parsed.autoExpireHours)
+              : DEFAULT_ADMIN_SETTINGS.autoExpireHours,
           bannerEnabled:
             typeof parsed.bannerEnabled === 'boolean'
               ? parsed.bannerEnabled
@@ -501,6 +509,10 @@ export const StorageCache = {
             typeof parsed.usersCount === 'number' && parsed.usersCount >= 0
               ? Math.round(parsed.usersCount)
               : DEFAULT_ADMIN_SETTINGS.usersCount,
+          useRealOnlineUsers:
+            typeof parsed.useRealOnlineUsers === 'boolean'
+              ? parsed.useRealOnlineUsers
+              : DEFAULT_ADMIN_SETTINGS.useRealOnlineUsers,
           customBanners: cleanedBanners,
           blockedAuthors: cleanedBlocked,
         };

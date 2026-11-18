@@ -13,6 +13,7 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -46,6 +47,7 @@ interface AdminPanelModalProps {
   gpsCityName: string | null;
   neighborhoodSettings: NeighborhoodSettings;
   adminSettings: AdminSettings;
+  realOnlineCount?: number;
   onUpdateAdminSettings: (next: AdminSettings) => void;
   onOpenItemDetail: (item: PostItem) => void;
   onUpdateItem: (updatedItem: PostItem) => void;
@@ -86,6 +88,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   gpsCityName,
   neighborhoodSettings,
   adminSettings,
+  realOnlineCount = 1,
   onUpdateAdminSettings,
   onOpenItemDetail,
   onUpdateItem,
@@ -430,9 +433,11 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   <View style={[styles.kpiCard, { borderColor: '#DDD6FE' }]}>
                     <MaterialCommunityIcons name="account-group" size={22} color="#7C3AED" />
                     <Text style={[styles.kpiValue, { color: '#7C3AED' }]}>
-                      {adminSettings.usersCount}
+                      {adminSettings.useRealOnlineUsers !== false ? realOnlineCount : adminSettings.usersCount}
                     </Text>
-                    <Text style={styles.kpiLabel}>Społeczność online</Text>
+                    <Text style={styles.kpiLabel}>
+                      Społeczność online {adminSettings.useRealOnlineUsers !== false ? '(na żywo)' : '(ręcznie)'}
+                    </Text>
                     <Text style={styles.kpiHint}>
                       {savedCount} zapisanych • seria {streakDays}d
                     </Text>
@@ -651,11 +656,15 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     />
                   </View>
 
-                  <View style={[styles.switchRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
+                  <View style={[styles.switchRow, { borderBottomWidth: adminSettings.autoExpireEnabled ? 1 : 0, paddingBottom: adminSettings.autoExpireEnabled ? 12 : 0 }]}>
                     <View style={styles.flexOne}>
-                      <Text style={styles.switchTitle}>Automatyczne wygasanie (TTL 6h)</Text>
+                      <Text style={styles.switchTitle}>
+                        Automatyczne wygasanie (TTL {adminSettings.autoExpireHours ?? 6}h)
+                      </Text>
                       <Text style={styles.switchSub}>
-                        Ukrywa niepotwierdzone wystawki starsze niż 6 godzin
+                        {adminSettings.autoExpireEnabled
+                          ? `Ukrywa niepotwierdzone wystawki starsze niż ${adminSettings.autoExpireHours ?? 6} godz.`
+                          : 'Wyłączone – wystawki nie wygasają automatycznie'}
                       </Text>
                     </View>
                     <Switch
@@ -665,31 +674,105 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       thumbColor={adminSettings.autoExpireEnabled ? '#10B981' : '#F1F5F9'}
                     />
                   </View>
+
+                  {adminSettings.autoExpireEnabled && (
+                    <View style={styles.sliderSectionBox}>
+                      <View style={styles.sliderHeaderRow}>
+                        <Text style={styles.sliderLabelTitle}>Czas wygasania wystawek:</Text>
+                        <View style={styles.sliderBadge}>
+                          <MaterialCommunityIcons name="clock-outline" size={14} color="#059669" />
+                          <Text style={styles.sliderBadgeText}>
+                            {adminSettings.autoExpireHours ?? 6} {((adminSettings.autoExpireHours ?? 6) === 1) ? 'godzina' : ((adminSettings.autoExpireHours ?? 6) < 5) ? 'godziny' : 'godzin'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Slider
+                        style={styles.adminSlider}
+                        minimumValue={1}
+                        maximumValue={72}
+                        step={1}
+                        value={adminSettings.autoExpireHours ?? 6}
+                        onValueChange={(val) => {
+                          onUpdateAdminSettings({
+                            ...adminSettings,
+                            autoExpireHours: Math.round(val),
+                          });
+                        }}
+                        minimumTrackTintColor="#059669"
+                        maximumTrackTintColor="#CBD5E1"
+                        thumbTintColor="#059669"
+                      />
+
+                      <View style={styles.sliderTicksRow}>
+                        <Text style={styles.sliderTickText}>1h</Text>
+                        <Text style={styles.sliderTickText}>6h</Text>
+                        <Text style={styles.sliderTickText}>12h</Text>
+                        <Text style={styles.sliderTickText}>24h</Text>
+                        <Text style={styles.sliderTickText}>48h</Text>
+                        <Text style={styles.sliderTickText}>72h</Text>
+                      </View>
+                    </View>
+                  )}
                 </View>
 
                 <Text style={styles.sectionTitle}>Licznik aktywnych użytkowników</Text>
                 <View style={styles.cardBox}>
-                  <View style={styles.counterControlRow}>
-                    <View>
-                      <Text style={styles.switchTitle}>Widoczna liczba osób online</Text>
-                      <Text style={styles.switchSub}>Wyświetlana w kółku społeczności na Pulpicie i Mapie</Text>
+                  <View style={styles.switchRow}>
+                    <View style={{ flex: 1, paddingRight: 10 }}>
+                      <Text style={styles.switchTitle}>Rzeczywista liczba online (na żywo)</Text>
+                      <Text style={styles.switchSub}>
+                        {adminSettings.useRealOnlineUsers !== false
+                          ? `Śledzenie na żywo (Supabase Presence): ${realOnlineCount} ${realOnlineCount === 1 ? 'osoba' : 'osób'} w sieci`
+                          : 'Wyłączony – wyświetlana jest ręczna wartość poniżej'}
+                      </Text>
                     </View>
-                    <Text style={styles.counterBigVal}>{adminSettings.usersCount}</Text>
+                    <Switch
+                      value={adminSettings.useRealOnlineUsers !== false}
+                      onValueChange={(val) =>
+                        onUpdateAdminSettings({
+                          ...adminSettings,
+                          useRealOnlineUsers: val,
+                        })
+                      }
+                      trackColor={{ false: '#CBD5E1', true: '#A7F3D0' }}
+                      thumbColor={adminSettings.useRealOnlineUsers !== false ? '#10B981' : '#F1F5F9'}
+                    />
                   </View>
-                  <View style={styles.counterBtnsRow}>
-                    {[-10, -1, 1, 10].map((delta) => (
-                      <TouchableOpacity
-                        key={delta}
-                        style={styles.counterStepBtn}
-                        onPress={() => handleAdjustUsersCount(delta)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.counterStepText}>
-                          {delta > 0 ? `+${delta}` : delta}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+
+                  <View style={[styles.counterControlRow, { marginTop: 12 }]}>
+                    <View>
+                      <Text style={styles.switchTitle}>
+                        {adminSettings.useRealOnlineUsers !== false
+                          ? 'Aktualnie wyświetlana liczba'
+                          : 'Ręczna liczba osób online'}
+                      </Text>
+                      <Text style={styles.switchSub}>
+                        {adminSettings.useRealOnlineUsers !== false
+                          ? 'Wyliczana automatycznie z aktywnych połączeń'
+                          : 'Nadpisana wartość testowa'}
+                      </Text>
+                    </View>
+                    <Text style={styles.counterBigVal}>
+                      {adminSettings.useRealOnlineUsers !== false ? realOnlineCount : adminSettings.usersCount}
+                    </Text>
                   </View>
+                  {adminSettings.useRealOnlineUsers === false && (
+                    <View style={styles.counterBtnsRow}>
+                      {[-10, -1, 1, 10].map((delta) => (
+                        <TouchableOpacity
+                          key={delta}
+                          style={styles.counterStepBtn}
+                          onPress={() => handleAdjustUsersCount(delta)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.counterStepText}>
+                            {delta > 0 ? `+${delta}` : delta}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                 </View>
 
                 <Text style={styles.sectionTitle}>Narzędzia serwisowe</Text>
@@ -713,12 +796,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     style={styles.toolBtn}
                     onPress={() => {
                       onResetDemoData();
-                      Alert.alert('Gotowe 🔄', 'Przywrócono domyślne ogłoszenia i wpisy demonstracyjne.');
+                      Alert.alert('Wyczyszczono 🗑️', 'Wszystkie przykładowe ogłoszenia i wpisy zostały usunięte.');
                     }}
                     activeOpacity={0.8}
                   >
-                    <MaterialCommunityIcons name="database-refresh-outline" size={20} color="#0284C7" />
-                    <Text style={styles.toolBtnText}>Przywróć dane demonstracyjne</Text>
+                    <MaterialCommunityIcons name="trash-can-outline" size={20} color="#EF4444" />
+                    <Text style={styles.toolBtnText}>Wyczyść przykładowe ogłoszenia</Text>
                     <MaterialCommunityIcons name="chevron-right" size={18} color="#94A3B8" />
                   </TouchableOpacity>
 
@@ -1385,5 +1468,53 @@ const styles = StyleSheet.create({
     fontSize: 14.5,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  sliderSectionBox: {
+    paddingTop: 12,
+  },
+  sliderHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  sliderLabelTitle: {
+    fontFamily: APP_FONT,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  sliderBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 4,
+  },
+  sliderBadgeText: {
+    fontFamily: APP_FONT,
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#065F46',
+  },
+  adminSlider: {
+    width: '100%',
+    height: 40,
+  },
+  sliderTicksRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    marginTop: -4,
+  },
+  sliderTickText: {
+    fontFamily: APP_FONT,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
   },
 });

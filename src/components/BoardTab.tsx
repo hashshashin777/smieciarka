@@ -24,6 +24,7 @@ interface BoardTabProps {
   onToggleSavePost?: (postId: string) => void;
   isRefreshing?: boolean;
   onRefresh?: () => void;
+  onBlockAuthor?: (authorName: string) => void;
 }
 
 export const BoardTab: React.FC<BoardTabProps> = ({
@@ -36,6 +37,7 @@ export const BoardTab: React.FC<BoardTabProps> = ({
   onToggleSavePost,
   isRefreshing = false,
   onRefresh,
+  onBlockAuthor,
 }) => {
   const [selectedTag, setSelectedTag] = useState<'all' | BoardTag>('all');
 
@@ -121,6 +123,7 @@ export const BoardTab: React.FC<BoardTabProps> = ({
             onLikeToggle={onLikeToggle}
             isSaved={savedPostIds.includes(item.id)}
             onToggleSave={onToggleSavePost}
+            onBlockAuthor={onBlockAuthor}
           />
         )}
         refreshControl={

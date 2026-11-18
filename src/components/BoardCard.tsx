@@ -12,6 +12,7 @@ interface BoardCardProps {
   onLikeToggle?: (postId: string) => void;
   isSaved?: boolean;
   onToggleSave?: (postId: string) => void;
+  onBlockAuthor?: (authorName: string) => void;
 }
 
 const BoardCardComponent: React.FC<BoardCardProps> = ({
@@ -20,6 +21,7 @@ const BoardCardComponent: React.FC<BoardCardProps> = ({
   onLikeToggle,
   isSaved = false,
   onToggleSave,
+  onBlockAuthor,
 }) => {
   const [localLiked, setLocalLiked] = useState(false);
   const isControlled = isLiked !== undefined;
@@ -37,11 +39,38 @@ const BoardCardComponent: React.FC<BoardCardProps> = ({
     }
   };
 
+  const handleReportPost = () => {
+    Alert.alert(
+      'Zgłoś wpis lub zablokuj autora',
+      `Czy chcesz zgłosić ten wpis lub zablokować użytkownika ${post.authorName}?`,
+      [
+        { text: 'Anuluj', style: 'cancel' },
+        {
+          text: 'Zgłoś spam / niestosowną treść',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert('Zgłoszenie przyjęte', 'Dziękujemy. Wpis został przekazany do moderacji.');
+          },
+        },
+        {
+          text: `Zablokuj autora (${post.authorName})`,
+          style: 'destructive',
+          onPress: () => {
+            if (onBlockAuthor) {
+              onBlockAuthor(post.authorName);
+              Alert.alert('Zablokowano', `Użytkownik ${post.authorName} został zablokowany.`);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleShare = async () => {
     try {
       await Share.share({
-        title: `Tablica Śmieciarki: ${post.title}`,
-        message: `Wpis z Tablicy Śmieciarki: „${post.title}” – ${post.content}\n\nDołącz do sąsiedzkiej tablicy: https://smieciarka.fun/board/${post.id}`,
+        title: `Tablica Wystawki: ${post.title}`,
+        message: `Wpis z Tablicy Wystawki: „${post.title}” – ${post.content}\n\nDołącz do sąsiedzkiej tablicy: https://wystawka.fun/board/${post.id}`,
       });
     } catch {
       Alert.alert('Nie udało się udostępnić', 'Spróbuj ponownie za chwilę.');
@@ -172,6 +201,17 @@ const BoardCardComponent: React.FC<BoardCardProps> = ({
             accessibilityRole="button"
           >
             <MaterialCommunityIcons name="share-variant-outline" size={17} color="#64748B" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.shareBtn}
+            onPress={handleReportPost}
+            activeOpacity={0.8}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="Zgłoś wpis lub zablokuj autora"
+            accessibilityRole="button"
+          >
+            <MaterialCommunityIcons name="flag-outline" size={16} color="#94A3B8" />
           </TouchableOpacity>
         </View>
 

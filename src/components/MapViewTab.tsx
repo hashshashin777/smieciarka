@@ -40,6 +40,7 @@ interface MapViewTabProps {
   onOpenDetail: (item: PostItem) => void;
   onRecenterGPS: () => void;
   usersCount?: number;
+  showOnlineBadge?: boolean;
   themeMode?: ThemeMode;
   onThemeModeChange?: (mode: ThemeMode) => void;
   isDark?: boolean;
@@ -56,6 +57,7 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
   onOpenDetail,
   onRecenterGPS,
   usersCount = 128,
+  showOnlineBadge = true,
   isDark = false,
   selectedCity = null,
   gpsCityName = null,
@@ -399,25 +401,27 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
         </View>
       )}
       {/* 7. OKRĄGŁY PŁYWAJĄCY PRZYCISK SPOŁECZNOŚCI (Skopiowany z pulpitu w stylu Yanosik) */}
-      <TouchableOpacity
-        style={[
-          styles.floatingCommunityBadge,
-          { bottom: (selectedItem ? 220 : 96) + Math.max(0, insets.bottom - 12) },
-        ]}
-        activeOpacity={0.85}
-        onPress={() =>
-          Alert.alert(
-            'Społeczność Śmieciarki 👥',
-            `${usersCount} użytkowników aktywnie przegląda i ratuje rzeczy w Twojej okolicy!`,
-            [{ text: 'Super!', style: 'default' }]
-          )
-        }
-      >
-        <View style={styles.floatingBadgeInner}>
-          <MaterialCommunityIcons name="account-multiple" size={24} color="#FFFFFF" />
-          <Text style={styles.floatingBadgeCount}>{usersCount}</Text>
-        </View>
-      </TouchableOpacity>
+      {showOnlineBadge && (
+        <TouchableOpacity
+          style={[
+            styles.floatingCommunityBadge,
+            { bottom: (selectedItem ? 220 : 96) + Math.max(0, insets.bottom - 12) },
+          ]}
+          activeOpacity={0.85}
+          onPress={() =>
+            Alert.alert(
+              'Społeczność na żywo 👥💚',
+              `W tej chwili ${usersCount} ${usersCount === 1 ? 'osoba jest teraz online w Twojej okolicy' : usersCount < 5 ? 'osoby są teraz online w Twojej okolicy' : 'osób jest teraz online w Twojej okolicy'}!\n\nLicznik aktualizuje się automatycznie w czasie rzeczywistym.`,
+              [{ text: 'Super!', style: 'default' }]
+            )
+          }
+        >
+          <View style={styles.floatingBadgeInner}>
+            <MaterialCommunityIcons name="account-multiple" size={24} color="#FFFFFF" />
+            <Text style={styles.floatingBadgeCount}>{usersCount}</Text>
+          </View>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };

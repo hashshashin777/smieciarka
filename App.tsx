@@ -13,6 +13,10 @@ import {
   LayoutAnimation,
   UIManager,
   RefreshControl,
+  AppState,
+  Keyboard,
+  PanResponder,
+  Animated,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -36,7 +40,7 @@ import { ItemCard } from './src/components/ItemCard';
 import { MapViewTab } from './src/components/MapViewTab';
 import { BoardTab } from './src/components/BoardTab';
 import { SavedTab } from './src/components/SavedTab';
-import { YanosikDashboard } from './src/components/YanosikDashboard';
+import { WystawkaDashboard } from './src/components/WystawkaDashboard';
 import { AddItemModal } from './src/components/AddItemModal';
 import { AddBoardPostModal } from './src/components/AddBoardPostModal';
 import { ItemDetailModal } from './src/components/ItemDetailModal';
@@ -78,6 +82,7 @@ import {
   deleteItemFromCloud,
   resetItemFlagsInCloud,
   updateItemInCloud,
+  subscribeToOnlinePresence,
   isSupabaseConfigured,
   supabase,
 } from './src/services/supabase';
@@ -134,11 +139,33 @@ const NAV_TABS: NavTabConfig[] = [
   },
 ];
 
+const SAMPLE_ITEM_IDS = new Set([
+  'post-1',
+  'post-2',
+  'post-3',
+  'post-4',
+  'post-5',
+  'post-lublin-1',
+  'post-lublin-2',
+  'post-lublin-3',
+  'post-lublin-4',
+]);
+
+const SAMPLE_BOARD_IDS = new Set([
+  'board-1',
+  'board-2',
+  'board-3',
+  'board-4',
+  'board-5',
+  'board-lublin-1',
+  'board-lublin-2',
+]);
+
 export default function App() {
   const [items, setItems] = useState<PostItem[]>(INITIAL_ITEMS);
   const [boardPosts, setBoardPosts] = useState<BoardPost[]>(INITIAL_BOARD_POSTS);
-  const [savedItemIds, setSavedItemIds] = useState<string[]>(['post-1']);
-  const [savedBoardPostIds, setSavedBoardPostIds] = useState<string[]>(['board-1']);
+  const [savedItemIds, setSavedItemIds] = useState<string[]>([]);
+  const [savedBoardPostIds, setSavedBoardPostIds] = useState<string[]>([]);
   const [likedBoardPostIds, setLikedBoardPostIds] = useState<string[]>([]);
   const [isCloudRefreshing, setIsCloudRefreshing] = useState(false);
   const [cloudLoadError, setCloudLoadError] = useState<string | null>(null);
@@ -146,6 +173,16 @@ export default function App() {
   const [filterType, setFilterType] = useState<'all' | ItemType>('all');
   const [viewMode, setViewMode] = useState<'home' | 'map' | 'list' | 'board' | 'saved'>('home');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const handleSearchChange = (query: string) => {
+    if (query.trim().toLowerCase() === '#admin') {
+      setSearchQuery('');
+      Keyboard.dismiss();
+      setIsAdminModalVisible(true);
+      return;
+    }
+    setSearchQuery(query);
+  };
   const [gpsCoords, setGpsCoords] = useState<{ latitude: number; longitude: number } | null>({
     latitude: 51.2465,
     longitude: 22.5684,
@@ -185,6 +222,7 @@ export default function App() {
 
   // Autoryzacja i konta (Apple, Google, Facebook) + Tryb Gość + Panel Admina
   const [adminSettings, setAdminSettings] = useState<AdminSettings>(DEFAULT_ADMIN_SETTINGS);
+  const [realOnlineCount, setRealOnlineCount] = useState<number>(1);
   const [isAdminModalVisible, setIsAdminModalVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isLoginModalVisible, setIsLoginModalVisible] = useState(false);
@@ -431,36 +469,27 @@ export default function App() {
 
         if (!isMounted) return;
 
-        if (cached && cached.length > 0) {
-          const cachedIds = new Set(cached.map((c) => c.id));
-          const newInitials = INITIAL_ITEMS.filter((it) => !cachedIds.has(it.id));
-          const combined = [...newInitials, ...cached];
-          setItems(combined);
-          StorageCache.saveCachedItems(combined);
-        } else {
-          setItems(INITIAL_ITEMS);
-          StorageCache.saveCachedItems(INITIAL_ITEMS);
-        }
+        // Wczytanie z pamięci podręcznej z odfiltrowaniem dawnych ogłoszeń przykładowych
+        const realCachedItems = (cached || []).filter((it) => !SAMPLE_ITEM_IDS.has(it.id));
+        setItems(realCachedItems);
+        StorageCache.saveCachedItems(realCachedItems);
 
-        if (cachedBoard && cachedBoard.length > 0) {
-          const cachedBoardIds = new Set(cachedBoard.map((p) => p.id));
-          const newInitialPosts = INITIAL_BOARD_POSTS.filter((p) => !cachedBoardIds.has(p.id));
-          const combinedBoard = [...newInitialPosts, ...cachedBoard];
-          setBoardPosts(combinedBoard);
-          StorageCache.saveCachedBoardPosts(combinedBoard);
-        } else {
-          setBoardPosts(INITIAL_BOARD_POSTS);
-          StorageCache.saveCachedBoardPosts(INITIAL_BOARD_POSTS);
-        }
+        const realCachedBoard = (cachedBoard || []).filter((p) => !SAMPLE_BOARD_IDS.has(p.id));
+        setBoardPosts(realCachedBoard);
+        StorageCache.saveCachedBoardPosts(realCachedBoard);
 
-        if (cachedSaved.length > 0) {
-          setSavedItemIds(cachedSaved);
-        }
-        if (cachedSavedBoard.length > 0) {
-          setSavedBoardPostIds(cachedSavedBoard);
-        }
+        const cleanSavedItems = (cachedSaved || []).filter((id) => !SAMPLE_ITEM_IDS.has(id));
+        setSavedItemIds(cleanSavedItems);
+        StorageCache.saveSavedIds(cleanSavedItems);
+
+        const cleanSavedBoard = (cachedSavedBoard || []).filter((id) => !SAMPLE_BOARD_IDS.has(id));
+        setSavedBoardPostIds(cleanSavedBoard);
+        StorageCache.saveSavedBoardPostIds(cleanSavedBoard);
+
         if (cachedLikedBoard.length > 0) {
-          setLikedBoardPostIds(cachedLikedBoard);
+          const cleanLikedBoard = cachedLikedBoard.filter((id) => !SAMPLE_BOARD_IDS.has(id));
+          setLikedBoardPostIds(cleanLikedBoard);
+          StorageCache.saveLikedBoardPostIds(cleanLikedBoard);
         }
 
         setNeighborhoodSettings(nSettings);
@@ -599,13 +628,60 @@ export default function App() {
     };
   }, [syncFromCloud]);
 
-  // Sprawdzanie czy wystawka wygasła (TTL = 6 godzin od wystawienia lub ostatniego potwierdzenia)
+  // 4. Śledzenie rzeczywistej liczby aktywnych użytkowników online przez Supabase Presence
+  useEffect(() => {
+    let unsub: (() => void) | null = null;
+    let isMounted = true;
+
+    const setupPresence = async () => {
+      try {
+        const voterKey = await StorageCache.getVoterKey();
+        const clientKey = currentUser?.id ? `user_${currentUser.id}` : `anon_${voterKey}`;
+        if (!isMounted) return;
+
+        unsub = subscribeToOnlinePresence((count) => {
+          if (isMounted) {
+            setRealOnlineCount(count);
+          }
+        }, clientKey);
+      } catch {
+        if (isMounted) setRealOnlineCount(1);
+      }
+    };
+
+    setupPresence();
+
+    const appStateSub = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        if (unsub) {
+          unsub();
+          unsub = null;
+        }
+        setupPresence();
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      appStateSub.remove();
+      if (unsub) {
+        unsub();
+      }
+    };
+  }, [currentUser?.id]);
+
+  const effectiveUsersCount =
+    adminSettings.useRealOnlineUsers !== false ? realOnlineCount : adminSettings.usersCount;
+
+  // Sprawdzanie czy wystawka wygasła (TTL ustalane przez admina, domyślnie 6 godzin)
+  const autoExpireHours = adminSettings.autoExpireHours ?? 6;
   const isItemActive = (item: PostItem): boolean => {
     if (item.status !== 'active') return false;
     if (adminSettings.autoExpireEnabled && item.type === 'wystawka') {
+      const ttlMs = autoExpireHours * 60 * 60 * 1000;
       const expiry = item.expiresAt
         ? new Date(item.expiresAt).getTime()
-        : new Date(item.createdAt).getTime() + 6 * 60 * 60 * 1000;
+        : new Date(item.createdAt).getTime() + ttlMs;
       if (nowTimestamp > expiry) {
         return false;
       }
@@ -1026,7 +1102,8 @@ export default function App() {
   };
 
   const handleAdminRestoreItem = (itemId: string) => {
-    const newExpiry = new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString();
+    const hours = adminSettings.autoExpireHours ?? 6;
+    const newExpiry = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
     setItems((prev) => {
       const updated = prev.map((it) =>
         it.id === itemId
@@ -1131,7 +1208,8 @@ export default function App() {
     action: 'restore' | 'archive' | 'delete'
   ) => {
     const idSet = new Set(itemIds);
-    const newExpiry = new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString();
+    const hours = adminSettings.autoExpireHours ?? 6;
+    const newExpiry = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
     setItems((prev) => {
       const next =
         action === 'delete'
@@ -1293,6 +1371,60 @@ export default function App() {
     await StorageCache.setTutorialCompleted(false);
   };
 
+  // Obsługa przełączania kart gestem przeciągnięcia (Swipe lewo / prawo)
+  const viewModeRef = useRef<ViewMode>(viewMode);
+  viewModeRef.current = viewMode;
+
+  const navigateTabBySwipe = useCallback((direction: 'next' | 'prev') => {
+    const tabOrder: ViewMode[] = ['home', 'map', 'list', 'board', 'saved'];
+    const currentIdx = tabOrder.indexOf(viewModeRef.current);
+    if (currentIdx === -1) return;
+
+    let targetIdx = currentIdx;
+    if (direction === 'next' && currentIdx < tabOrder.length - 1) {
+      targetIdx = currentIdx + 1;
+    } else if (direction === 'prev' && currentIdx > 0) {
+      targetIdx = currentIdx - 1;
+    }
+
+    if (targetIdx !== currentIdx) {
+      setViewMode(tabOrder[targetIdx]);
+    }
+  }, []);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Nie przechwytuj gestów na mapie, aby użytkownik mógł swobodnie przesuwać mapę
+        if (viewModeRef.current === 'map') return false;
+        // Aktywuj tylko przy wyraźnym poziomym geście (dx > 25 oraz dominacja nad ruchem pionowym)
+        return (
+          Math.abs(gestureState.dx) > 25 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.8
+        );
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const minSwipeDistance = 50;
+        const minSwipeVelocity = 0.25;
+
+        // Przeciągnięcie w lewo -> następna karta
+        if (
+          gestureState.dx < -minSwipeDistance ||
+          (gestureState.dx < -25 && gestureState.vx < -minSwipeVelocity)
+        ) {
+          navigateTabBySwipe('next');
+        }
+        // Przeciągnięcie w prawo -> poprzednia karta
+        else if (
+          gestureState.dx > minSwipeDistance ||
+          (gestureState.dx > 25 && gestureState.vx > minSwipeVelocity)
+        ) {
+          navigateTabBySwipe('prev');
+        }
+      },
+    })
+  ).current;
+
   return (
     <SafeAreaProvider>
       <View style={styles.rootContainer}>
@@ -1332,7 +1464,7 @@ export default function App() {
             wystawkaCount={wystawkaCount}
             oddamCount={oddamCount}
             searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
+            onSearchChange={handleSearchChange}
             onGoBackToHome={() => setViewMode('home')}
             isDark={false}
             adsEnabled={adminSettings.adsEnabled}
@@ -1341,11 +1473,11 @@ export default function App() {
         )}
 
         {/* Main Content: Home Dashboard, Map, List, Board or Saved */}
-        <View style={styles.content}>
+        <View style={styles.content} {...panResponder.panHandlers}>
           {viewMode === 'home' ? (
-            <YanosikDashboard
+            <WystawkaDashboard
               searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
+              onSearchChange={handleSearchChange}
               onOpenMap={() => setViewMode('map')}
               onOpenList={(type) => {
                 if (type) setFilterType(type);
@@ -1359,7 +1491,7 @@ export default function App() {
               wystawkaCount={wystawkaCount}
               oddamCount={oddamCount}
               recentItems={dashboardItems}
-              usersCount={adminSettings.usersCount}
+              usersCount={effectiveUsersCount}
               ecoStats={ecoStats}
               streakDays={streakDays}
               neighborhoodSettings={neighborhoodSettings}
@@ -1399,6 +1531,7 @@ export default function App() {
               showAuthControls={adminSettings.accountsEnabled}
               adsEnabled={adminSettings.adsEnabled}
               customBanners={adminSettings.customBanners}
+              showOnlineBadge={adminSettings.useRealOnlineUsers !== false}
               onOpenAdmin={() => setIsAdminModalVisible(true)}
               onOpenLogin={adminSettings.accountsEnabled ? () => setIsLoginModalVisible(true) : undefined}
               onSignOut={adminSettings.accountsEnabled ? handleSignOut : undefined}
@@ -1415,7 +1548,8 @@ export default function App() {
               selectedItem={selectedMapItem}
               onSelectItem={setSelectedMapItem}
               onOpenDetail={(item) => setDetailItem(item)}
-              usersCount={adminSettings.usersCount}
+              usersCount={effectiveUsersCount}
+              showOnlineBadge={adminSettings.useRealOnlineUsers !== false}
               themeMode="light"
               isDark={false}
               selectedCity={selectedCity}
@@ -1594,6 +1728,7 @@ export default function App() {
               onToggleSavePost={handleToggleSaveBoardPost}
               isRefreshing={isCloudRefreshing}
               onRefresh={handleRefreshCloud}
+              onBlockAuthor={handleAdminToggleBlockAuthor}
             />
           ) : (
             <SavedTab
@@ -1625,11 +1760,11 @@ export default function App() {
             </View>
           )}
 
-          {/* SAMOUCZEK - Krok 5 (Tablica ogłoszeń): Wskazuje zakładkę Tablica */}
-          {tutorialStepIndex === 4 && (
+          {/* SAMOUCZEK - Ostatni Krok (Tablica ogłoszeń): Wskazuje zakładkę Tablica */}
+          {tutorialStepIndex === 7 && (
             <View style={styles.tutorialStep4Container} pointerEvents="box-none">
               <TutorialTooltip
-                {...TUTORIAL_STEPS[4]}
+                {...TUTORIAL_STEPS[7]}
                 isLastStep={true}
                 onNext={handleNextTutorialStep}
                 onDismiss={handleDismissTutorial}
@@ -1714,7 +1849,7 @@ export default function App() {
                     key={tab.id}
                     style={[
                       styles.navTabPill,
-                      tab.id === 'board' && tutorialStepIndex === 4 && styles.highlightedBoardTab,
+                      tab.id === 'board' && tutorialStepIndex === 7 && styles.highlightedBoardTab,
                     ]}
                     onPress={() => {
                       if (viewMode !== tab.id) {
@@ -1754,13 +1889,10 @@ export default function App() {
                   key={tab.id}
                   style={[
                     styles.navTabCircle,
-                    tab.id === 'board' && tutorialStepIndex === 4 && styles.highlightedBoardTab,
+                    tab.id === 'board' && tutorialStepIndex === 7 && styles.highlightedBoardTab,
                   ]}
                   onPress={() => {
                     if (viewMode !== tab.id) {
-                      try {
-                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                      } catch {}
                       setViewMode(tab.id);
                     }
                   }}
@@ -1811,6 +1943,7 @@ export default function App() {
           currentUser={adminSettings.accountsEnabled ? currentUser : null}
           accountsEnabled={adminSettings.accountsEnabled}
           onOpenChat={() => handleOpenChat(detailItem)}
+          onBlockAuthor={handleAdminToggleBlockAuthor}
         />
 
         <NeighborhoodModal
@@ -1867,6 +2000,7 @@ export default function App() {
           gpsCityName={gpsCityName}
           neighborhoodSettings={neighborhoodSettings}
           adminSettings={adminSettings}
+          realOnlineCount={realOnlineCount}
           onUpdateAdminSettings={handleUpdateAdminSettings}
           onOpenItemDetail={(item) => {
             setIsAdminModalVisible(false);

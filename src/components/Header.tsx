@@ -29,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
   oddamCount,
   searchQuery,
   onSearchChange,
-  usersCount = 128,
+  usersCount = 1,
   onGoBackToHome,
   isDark = false,
   adsEnabled = true,
@@ -163,6 +163,11 @@ export const Header: React.FC<HeaderProps> = ({
             placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
             value={searchQuery}
             onChangeText={onSearchChange}
+            onSubmitEditing={() => {
+              if (searchQuery.trim().toLowerCase() === '#admin') {
+                onSearchChange('#admin');
+              }
+            }}
             returnKeyType="search"
             autoCapitalize="none"
             autoCorrect={false}
