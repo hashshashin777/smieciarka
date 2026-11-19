@@ -163,16 +163,10 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
               activeOpacity={0.8}
             >
               <Image
-                source={require('../assets/icon.png')}
-                style={styles.logoIcon}
+                source={require('../assets/web_logo.webp')}
+                style={styles.webLogoImage}
                 resizeMode="contain"
               />
-              <View style={styles.logoTextWrapper}>
-                <Text style={styles.logoTitle}>Wystawka</Text>
-                <View style={styles.logoBadge}>
-                  <Text style={styles.logoBadgeText}>ZERO-WASTE</Text>
-                </View>
-              </View>
             </TouchableOpacity>
 
             {/* Right Action Menu */}
@@ -182,7 +176,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 onPress={() => handleTabChange('board')}
                 activeOpacity={0.8}
               >
-                <MaterialCommunityIcons name="forum-outline" size={20} color="#FFFFFF" />
+                <MaterialCommunityIcons name="forum-outline" size={20} color="#002F34" />
                 <Text style={styles.navLinkText}>Tablica sąsiedzka</Text>
               </TouchableOpacity>
 
@@ -194,7 +188,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 <MaterialCommunityIcons
                   name={savedItemIds.length > 0 ? 'heart' : 'heart-outline'}
                   size={20}
-                  color={savedItemIds.length > 0 ? '#EF4444' : '#FFFFFF'}
+                  color={savedItemIds.length > 0 ? '#EF4444' : '#002F34'}
                 />
                 <Text style={styles.navLinkText}>
                   Zapisane ({savedItemIds.length + savedBoardPostIds.length})
@@ -206,7 +200,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 onPress={onOpenAuth}
                 activeOpacity={0.8}
               >
-                <MaterialCommunityIcons name="account-circle-outline" size={22} color="#FFFFFF" />
+                <MaterialCommunityIcons name="account-circle-outline" size={22} color="#002F34" />
                 <Text style={styles.navLinkText}>
                   {currentUser ? currentUser.name || 'Twoje konto' : 'Zaloguj się'}
                 </Text>
@@ -218,8 +212,8 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                   onPress={onOpenAdmin}
                   activeOpacity={0.8}
                 >
-                  <MaterialCommunityIcons name="shield-crown-outline" size={18} color="#FBBF24" />
-                  <Text style={[styles.navLinkText, { color: '#FBBF24', fontWeight: '700' }]}>Admin</Text>
+                  <MaterialCommunityIcons name="shield-crown-outline" size={18} color="#D97706" />
+                  <Text style={[styles.navLinkText, { color: '#D97706', fontWeight: '700' }]}>Admin</Text>
                 </TouchableOpacity>
               )}
 
@@ -229,7 +223,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 onPress={onOpenAddModal}
                 activeOpacity={0.85}
               >
-                <MaterialCommunityIcons name="plus" size={20} color="#002F34" />
+                <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />
                 <Text style={styles.addCtaButtonText}>Dodaj ogłoszenie</Text>
               </TouchableOpacity>
             </View>
@@ -836,13 +830,12 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
         <View style={styles.footerContainer}>
           <View style={styles.footerInner}>
             <View style={styles.footerCol}>
-              <View style={styles.footerLogoRow}>
+              <View style={styles.footerLogoBadge}>
                 <Image
-                  source={require('../assets/icon.png')}
-                  style={{ width: 28, height: 28, borderRadius: 6 }}
+                  source={require('../assets/web_logo.webp')}
+                  style={{ width: 135, height: 42 }}
                   resizeMode="contain"
                 />
-                <Text style={styles.footerLogoTitle}>Wystawka Zero-Waste</Text>
               </View>
               <Text style={styles.footerDesc}>
                 Społecznościowa platforma sąsiedzka łącząca ludzi, którzy chcą uratować rzeczy z ulicy lub oddać
@@ -928,10 +921,14 @@ const styles = StyleSheet.create({
   // 1. TOP NAVBAR
   topNavbar: {
     width: '100%',
-    backgroundColor: '#002F34',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#002428',
-    paddingVertical: 12,
+    borderBottomColor: '#E2E8F0',
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
   topNavbarInner: {
     maxWidth: 1240,
@@ -946,32 +943,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  logoIcon: {
-    width: 44,
-    height: 44,
-  },
-  logoTextWrapper: {
-    marginLeft: 10,
-  },
-  logoTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-  },
-  logoBadge: {
-    backgroundColor: '#10B981',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    alignSelf: 'flex-start',
-    marginTop: 2,
-  },
-  logoBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
+  webLogoImage: {
+    width: 165,
+    height: 52,
   },
   topNavActions: {
     flexDirection: 'row',
@@ -987,30 +961,30 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   navLinkText: {
-    color: '#FFFFFF',
+    color: '#002F34',
     fontSize: 14,
     fontWeight: '600',
   },
   adminPill: {
-    backgroundColor: 'rgba(251, 191, 36, 0.15)',
+    backgroundColor: '#FEF3C7',
     borderWidth: 1,
-    borderColor: '#FBBF24',
+    borderColor: '#F59E0B',
   },
   addCtaButton: {
-    backgroundColor: '#23E5DB', // OLX vibrant mint/cyan CTA
-    paddingHorizontal: 18,
+    backgroundColor: '#002F34',
+    paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    shadowColor: '#23E5DB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowColor: '#002F34',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
   },
   addCtaButtonText: {
-    color: '#002F34',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -1656,16 +1630,13 @@ const styles = StyleSheet.create({
     width: 'calc(25% - 24px)' as any,
     minWidth: 220,
   },
-  footerLogoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  footerLogoTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#FFFFFF',
+  footerLogoBadge: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 14,
   },
   footerDesc: {
     fontSize: 13,
