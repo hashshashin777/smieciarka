@@ -17,7 +17,7 @@ export const BANNER_SLOTS: BannerSlotMeta[] = [
     id: 'home',
     label: 'Baner na Pulpicie',
     locationHint: 'Główny ekran Pulpit (nad wyszukiwarką)',
-    defaultLabel: 'Domyślny baner Śmieciarki',
+    defaultLabel: 'Domyślny baner Wystawki',
     defaultSource: require('../assets/ad_banner.webp'),
   },
   {
