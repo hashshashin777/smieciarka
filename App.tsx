@@ -17,6 +17,7 @@ import {
   Keyboard,
   PanResponder,
   Animated,
+  useWindowDimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -41,6 +42,7 @@ import { MapViewTab } from './src/components/MapViewTab';
 import { BoardTab } from './src/components/BoardTab';
 import { SavedTab } from './src/components/SavedTab';
 import { WystawkaDashboard } from './src/components/WystawkaDashboard';
+import { DesktopWebLayout } from './src/components/DesktopWebLayout';
 import { AddItemModal } from './src/components/AddItemModal';
 import { AddBoardPostModal } from './src/components/AddBoardPostModal';
 import { ItemDetailModal } from './src/components/ItemDetailModal';
@@ -171,6 +173,7 @@ export default function App() {
   const [cloudLoadError, setCloudLoadError] = useState<string | null>(null);
   const [pendingDeepLinkItemId, setPendingDeepLinkItemId] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<'all' | ItemType>('all');
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'home' | 'map' | 'list' | 'board' | 'saved'>('home');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -243,6 +246,9 @@ export default function App() {
       // Ignore
     }
   };
+
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && windowWidth >= 800;
 
   // Ekran powitalny: 5 sekund z możliwością wcześniejszego zamknięcia
   useEffect(() => {
@@ -1428,12 +1434,44 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <View style={styles.rootContainer}>
-        <SpotlightBackground />
-        <SafeAreaView style={styles.container}>
+        {!isDesktopWeb && <SpotlightBackground />}
+        <SafeAreaView style={[styles.container, isDesktopWeb && { backgroundColor: '#F2F4F5' }]}>
           <StatusBar style="dark" />
 
-        {/* Pomarańczowy pasek informacyjny w stylu Yanosik */}
-        {showBetaNotice && (
+        {isDesktopWeb ? (
+          <DesktopWebLayout
+            items={items.filter((i) => isItemActive(i) && !isAuthorBlocked(i.authorName))}
+            boardPosts={boardPosts.filter((p) => !isAuthorBlocked(p.authorName))}
+            savedItemIds={savedItemIds}
+            savedBoardPostIds={savedBoardPostIds}
+            searchQuery={searchQuery}
+            onSearchChange={handleSearchChange}
+            filterType={filterType}
+            onSelectFilterType={setFilterType}
+            filterCategory={filterCategory}
+            onSelectCategory={setFilterCategory}
+            selectedCity={selectedCity}
+            gpsCityName={gpsCityName}
+            onOpenCityPicker={() => setIsCityModalVisible(true)}
+            onOpenDetail={(item) => setDetailItem(item)}
+            onOpenAddModal={() => setIsAddModalVisible(true)}
+            onOpenBoardModal={() => setIsAddBoardModalVisible(true)}
+            onToggleSaveItem={(item) => handleToggleSaveItem(item.id)}
+            onToggleSaveBoardPost={(post) => handleToggleSaveBoardPost(post.id)}
+            onStillThere={(itemId) => handleVoteStillThere(itemId)}
+            onTakeItem={(item) => handleVoteTaken(item.id)}
+            currentUser={currentUser}
+            onOpenAuth={() => setIsLoginModalVisible(true)}
+            onOpenAdmin={() => setIsAdminModalVisible(true)}
+            ecoStats={ecoStats}
+            usersCount={effectiveUsersCount}
+            userCoords={userCoords}
+            adminSettings={adminSettings}
+          />
+        ) : (
+          <>
+            {/* Pomarańczowy pasek informacyjny w stylu Yanosik */}
+            {showBetaNotice && (
           <View style={styles.orangeBanner}>
             <TouchableOpacity
               style={styles.bannerCloseBtn}
@@ -1916,6 +1954,8 @@ export default function App() {
             })}
           </View>
         </View>
+        </>
+      )}
 
         {/* Modals */}
         <AddItemModal
@@ -2027,7 +2067,7 @@ export default function App() {
 
         {/* Ekran powitalny (Splash Screen - 5 sekund z możliwością wcześniejszego zamknięcia przyciskiem X) */}
         <Modal
-          visible={showWelcome}
+          visible={!isDesktopWeb && showWelcome}
           animationType="fade"
           transparent={false}
           onRequestClose={checkAuthAfterSplash}
