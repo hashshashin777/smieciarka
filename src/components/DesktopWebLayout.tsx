@@ -176,7 +176,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 onPress={() => handleTabChange('board')}
                 activeOpacity={0.8}
               >
-                <MaterialCommunityIcons name="forum-outline" size={20} color="#002F34" />
+                <MaterialCommunityIcons name="forum-outline" size={20} color="#FFFFFF" />
                 <Text style={styles.navLinkText}>Tablica sąsiedzka</Text>
               </TouchableOpacity>
 
@@ -188,7 +188,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 <MaterialCommunityIcons
                   name={savedItemIds.length > 0 ? 'heart' : 'heart-outline'}
                   size={20}
-                  color={savedItemIds.length > 0 ? '#EF4444' : '#002F34'}
+                  color={savedItemIds.length > 0 ? '#EF4444' : '#FFFFFF'}
                 />
                 <Text style={styles.navLinkText}>
                   Zapisane ({savedItemIds.length + savedBoardPostIds.length})
@@ -200,7 +200,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 onPress={onOpenAuth}
                 activeOpacity={0.8}
               >
-                <MaterialCommunityIcons name="account-circle-outline" size={22} color="#002F34" />
+                <MaterialCommunityIcons name="account-circle-outline" size={22} color="#FFFFFF" />
                 <Text style={styles.navLinkText}>
                   {currentUser ? currentUser.name || 'Twoje konto' : 'Zaloguj się'}
                 </Text>
@@ -212,8 +212,8 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                   onPress={onOpenAdmin}
                   activeOpacity={0.8}
                 >
-                  <MaterialCommunityIcons name="shield-crown-outline" size={18} color="#D97706" />
-                  <Text style={[styles.navLinkText, { color: '#D97706', fontWeight: '700' }]}>Admin</Text>
+                  <MaterialCommunityIcons name="shield-crown-outline" size={18} color="#FBBF24" />
+                  <Text style={[styles.navLinkText, { color: '#FBBF24', fontWeight: '700' }]}>Admin</Text>
                 </TouchableOpacity>
               )}
 
@@ -223,7 +223,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 onPress={onOpenAddModal}
                 activeOpacity={0.85}
               >
-                <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />
+                <MaterialCommunityIcons name="plus" size={20} color="#002F34" />
                 <Text style={styles.addCtaButtonText}>Dodaj ogłoszenie</Text>
               </TouchableOpacity>
             </View>
@@ -830,10 +830,10 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
         <View style={styles.footerContainer}>
           <View style={styles.footerInner}>
             <View style={styles.footerCol}>
-              <View style={styles.footerLogoBadge}>
+              <View style={{ marginBottom: 12 }}>
                 <Image
                   source={require('../assets/web_logo.webp')}
-                  style={{ width: 135, height: 42 }}
+                  style={{ width: 155, height: 50 }}
                   resizeMode="contain"
                 />
               </View>
@@ -921,14 +921,14 @@ const styles = StyleSheet.create({
   // 1. TOP NAVBAR
   topNavbar: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#002F34',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#002428',
     paddingVertical: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
   },
   topNavbarInner: {
     maxWidth: 1240,
@@ -944,8 +944,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   webLogoImage: {
-    width: 165,
-    height: 52,
+    width: 175,
+    height: 55,
   },
   topNavActions: {
     flexDirection: 'row',
@@ -961,30 +961,30 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   navLinkText: {
-    color: '#002F34',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
   adminPill: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: 'rgba(251, 191, 36, 0.15)',
     borderWidth: 1,
-    borderColor: '#F59E0B',
+    borderColor: '#FBBF24',
   },
   addCtaButton: {
-    backgroundColor: '#002F34',
-    paddingHorizontal: 20,
+    backgroundColor: '#23E5DB', // OLX high-contrast cyan/mint
+    paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    shadowColor: '#002F34',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+    shadowColor: '#23E5DB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   addCtaButtonText: {
-    color: '#FFFFFF',
+    color: '#002F34',
     fontSize: 14,
     fontWeight: '700',
   },
