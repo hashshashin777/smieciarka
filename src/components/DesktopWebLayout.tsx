@@ -223,7 +223,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 onPress={onOpenAddModal}
                 activeOpacity={0.85}
               >
-                <MaterialCommunityIcons name="plus" size={20} color="#002F34" />
+                <MaterialCommunityIcons name="plus" size={20} color="#021E19" />
                 <Text style={styles.addCtaButtonText}>Dodaj ogłoszenie</Text>
               </TouchableOpacity>
             </View>
@@ -757,7 +757,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                             <MaterialCommunityIcons
                               name={isSaved ? 'heart' : 'heart-outline'}
                               size={20}
-                              color={isSaved ? '#EF4444' : '#002F34'}
+                              color={isSaved ? '#EF4444' : '#021E19'}
                             />
                           </TouchableOpacity>
                         </TouchableOpacity>
@@ -921,9 +921,9 @@ const styles = StyleSheet.create({
   // 1. TOP NAVBAR
   topNavbar: {
     width: '100%',
-    backgroundColor: '#002F34',
+    backgroundColor: '#021E19',
     borderBottomWidth: 1,
-    borderBottomColor: '#002428',
+    borderBottomColor: '#011511',
     paddingVertical: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -984,7 +984,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   addCtaButtonText: {
-    color: '#002F34',
+    color: '#021E19',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -992,7 +992,7 @@ const styles = StyleSheet.create({
   // 2. HERO SEARCH SECTION
   heroSearchSection: {
     width: '100%',
-    backgroundColor: '#002F34',
+    backgroundColor: '#021E19',
     paddingTop: 16,
     paddingBottom: 36,
   },
@@ -1054,7 +1054,7 @@ const styles = StyleSheet.create({
     maxWidth: 160,
   },
   searchSubmitButton: {
-    backgroundColor: '#002F34',
+    backgroundColor: '#021E19',
     paddingHorizontal: 28,
     height: 48,
     borderRadius: 8,
@@ -1106,7 +1106,7 @@ const styles = StyleSheet.create({
   sectionHeaderTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#002F34',
+    color: '#021E19',
     marginBottom: 16,
   },
   sectionHeaderSub: {
@@ -1204,7 +1204,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   desktopTabTextActive: {
-    color: '#002F34',
+    color: '#021E19',
     fontWeight: '700',
   },
   tabBadgeDot: {
@@ -1305,7 +1305,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#002F34',
+    color: '#021E19',
     lineHeight: 20,
     height: 40,
     marginBottom: 8,
@@ -1382,7 +1382,7 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#002F34',
+    color: '#021E19',
     marginTop: 12,
   },
   emptyStateDesc: {
@@ -1406,7 +1406,7 @@ const styles = StyleSheet.create({
   boardSectionTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#002F34',
+    color: '#021E19',
   },
   boardSectionSub: {
     fontSize: 14,
@@ -1477,7 +1477,7 @@ const styles = StyleSheet.create({
   boardCardTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#002F34',
+    color: '#021E19',
     marginBottom: 8,
   },
   boardCardContent: {
@@ -1548,7 +1548,7 @@ const styles = StyleSheet.create({
   mapSidebarTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#002F34',
+    color: '#021E19',
     marginBottom: 12,
   },
   mapSidebarScroll: {
@@ -1598,7 +1598,7 @@ const styles = StyleSheet.create({
   mapSidebarItemTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#002F34',
+    color: '#021E19',
   },
   mapSidebarItemAddress: {
     fontSize: 11,
@@ -1609,9 +1609,9 @@ const styles = StyleSheet.create({
   // 5. FOOTER
   footerContainer: {
     width: '100%',
-    backgroundColor: '#002F34',
+    backgroundColor: '#021E19',
     borderTopWidth: 1,
-    borderTopColor: '#002428',
+    borderTopColor: '#011511',
     paddingTop: 48,
     paddingBottom: 32,
     marginTop: 48,
