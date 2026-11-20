@@ -1263,8 +1263,8 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 <Image
                   source={require('../assets/web_logo.webp')}
                   style={{
-                    width: 195,
-                    height: 58,
+                    width: 86,
+                    height: 56,
                     filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))' as any,
                   }}
                   resizeMode="contain"
@@ -1393,8 +1393,8 @@ const styles = StyleSheet.create({
     cursor: 'pointer' as any,
   },
   webLogoImage: {
-    width: 220,
-    height: 66,
+    width: 96,
+    height: 64,
     filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))' as any,
   },
   topNavActions: {
