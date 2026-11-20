@@ -1367,7 +1367,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#064E3B',
     borderBottomWidth: 1,
     borderBottomColor: '#043D2E',
-    paddingVertical: 12,
+    paddingVertical: 6,
     minHeight: 74,
     justifyContent: 'center',
     shadowColor: '#000',
@@ -1387,14 +1387,13 @@ const styles = StyleSheet.create({
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 2,
     paddingHorizontal: 4,
     borderRadius: 8,
     cursor: 'pointer' as any,
   },
   webLogoImage: {
-    width: 96,
-    height: 64,
+    width: 110,
+    height: 74,
     filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))' as any,
   },
   topNavActions: {
