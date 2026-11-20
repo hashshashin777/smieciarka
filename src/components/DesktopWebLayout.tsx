@@ -1262,7 +1262,11 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
               <View style={styles.footerLogoBadge}>
                 <Image
                   source={require('../assets/web_logo.webp')}
-                  style={{ width: 155, height: 48 }}
+                  style={{
+                    width: 195,
+                    height: 58,
+                    filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))' as any,
+                  }}
                   resizeMode="contain"
                 />
               </View>
@@ -1363,7 +1367,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#064E3B',
     borderBottomWidth: 1,
     borderBottomColor: '#043D2E',
-    paddingVertical: 10,
+    paddingVertical: 12,
+    minHeight: 74,
+    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
@@ -1381,11 +1387,15 @@ const styles = StyleSheet.create({
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    borderRadius: 8,
     cursor: 'pointer' as any,
   },
   webLogoImage: {
-    width: 175,
-    height: 52,
+    width: 220,
+    height: 66,
+    filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))' as any,
   },
   topNavActions: {
     flexDirection: 'row',
