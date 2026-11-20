@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,47 @@ import {
   Image,
   ScrollView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { PostItem, ItemType, BoardPost, UserProfile } from '../types';
 import { CATEGORIES, THEME } from '../constants/categories';
 import { CityOption, getCityDisplayLabel } from '../constants/cities';
 import { calculateDistance, formatRelativeTime, safeOpenUrl } from '../utils/helpers';
 import { EcoStats, AdminSettings } from '../services/storageCache';
 import { resolveBannerSource } from '../constants/banners';
+import { fetchAirQuality, AirQualityData } from '../services/airQuality';
+
+const WEEKDAYS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
+const MONTHS_SHORT_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
+
+function getCalendarWeekDays(streakDays: number = 3) {
+  const now = new Date();
+  const todayIndex = (now.getDay() + 6) % 7; // 0 = Pn .. 6 = Nd
+  const monday = new Date(now);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(now.getDate() - todayIndex);
+
+  const days = WEEKDAYS.map((label, idx) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + idx);
+    const isToday = idx === todayIndex;
+    const isCompleted = idx <= todayIndex && todayIndex - idx < Math.max(streakDays, 1);
+    const isFuture = idx > todayIndex;
+
+    return {
+      label,
+      dayNumber: date.getDate(),
+      isToday,
+      isCompleted,
+      isFuture,
+    };
+  });
+
+  const todayFormatted = `${WEEKDAYS[todayIndex]}, ${now.getDate()} ${MONTHS_SHORT_PL[now.getMonth()]}`;
+  return { days, todayFormatted };
+}
 
 interface DesktopWebLayoutProps {
   items: PostItem[];
@@ -45,6 +78,7 @@ interface DesktopWebLayoutProps {
   usersCount: number;
   userCoords?: { latitude: number; longitude: number } | null;
   adminSettings: AdminSettings;
+  streakDays?: number;
 }
 
 type DesktopTab = 'all' | 'wystawka' | 'oddam' | 'board' | 'map' | 'saved';
@@ -77,10 +111,41 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
   usersCount,
   userCoords,
   adminSettings,
+  streakDays = 3,
 }) => {
   // Strona główna domyślnie otwiera się z widokiem mapy zgodnie z ustaleniami
   const [activeTab, setActiveTab] = useState<DesktopTab>('map');
   const [localSearch, setLocalSearch] = useState(searchQuery);
+
+  const { days: calendarDays, todayFormatted } = useMemo(
+    () => getCalendarWeekDays(streakDays),
+    [streakDays]
+  );
+
+  const [airData, setAirData] = useState<AirQualityData | null>(null);
+  const [airLoading, setAirLoading] = useState<boolean>(false);
+
+  const cityLabel = getCityDisplayLabel(selectedCity, gpsCityName);
+  const airLat = selectedCity?.latitude ?? userCoords?.latitude ?? 51.2465;
+  const airLon = selectedCity?.longitude ?? userCoords?.longitude ?? 22.5684;
+
+  const loadAirQuality = useCallback(async () => {
+    setAirLoading(true);
+    try {
+      const res = await fetchAirQuality(airLat, airLon, cityLabel);
+      if (res) {
+        setAirData(res);
+      }
+    } catch {
+      // fallback
+    } finally {
+      setAirLoading(false);
+    }
+  }, [airLat, airLon, cityLabel]);
+
+  useEffect(() => {
+    loadAirQuality();
+  }, [loadAirQuality]);
 
   const handleSearchSubmit = () => {
     onSearchChange(localSearch);
@@ -144,8 +209,6 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
     }
     return result;
   }, [boardPosts, activeTab, savedBoardPostIds, searchQuery]);
-
-  const cityLabel = getCityDisplayLabel(selectedCity, gpsCityName);
 
   // Dynamic OpenStreetMap viewport calculation
   const mapCenterLat = selectedCity?.latitude || 51.2465;
@@ -333,6 +396,161 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 <Text style={styles.addCtaButtonText}>Dodaj ogłoszenie</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+
+        {/* MODUŁY WIDGETÓW GÓRNYCH: SERIA ZERO-WASTE & CZYSTE POWIETRZE */}
+        <View style={styles.topWidgetsSection}>
+          <View style={styles.topWidgetsInner}>
+            {/* 1. KARTA: MODUŁ SERII ZERO-WASTE */}
+            <LinearGradient
+              colors={['#064E3B', '#022C22']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.widgetCard}
+            >
+              <View style={styles.widgetHeaderRow}>
+                <View style={styles.flameIconBox}>
+                  <MaterialCommunityIcons name="fire" size={24} color="#FBBF24" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.widgetTitle}>
+                    Seria: <Text style={styles.widgetHighlight}>{streakDays} {streakDays === 1 ? 'dzień' : 'dni'} z rzędu</Text>
+                  </Text>
+                  <Text style={styles.widgetSub}>
+                    {streakDays >= 5 ? 'Świetna regularność Zero-Waste!' : 'Odwiedzaj nas codziennie, by ratować przedmioty'}
+                  </Text>
+                </View>
+                <View style={styles.calendarDateBadge}>
+                  <MaterialCommunityIcons name="calendar-today" size={12} color="#FDE68A" style={{ marginRight: 4 }} />
+                  <Text style={styles.calendarDateText}>{todayFormatted}</Text>
+                </View>
+              </View>
+
+              {/* Tydzień kalendarzowy Pn - Nd */}
+              <View style={styles.weekCalendarRow}>
+                {calendarDays.map((day) => (
+                  <View key={day.label} style={styles.calendarDayCol}>
+                    <Text
+                      style={[
+                        styles.calendarWeekdayLabel,
+                        day.isToday && styles.calendarWeekdayLabelToday,
+                        day.isFuture && styles.calendarWeekdayLabelFuture,
+                      ]}
+                    >
+                      {day.label}
+                    </Text>
+                    <View
+                      style={[
+                        styles.calendarCircle,
+                        day.isCompleted && !day.isToday && styles.calendarCircleDone,
+                        day.isToday && styles.calendarCircleToday,
+                        day.isFuture && styles.calendarCircleFuture,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.calendarDayNumber,
+                          day.isCompleted && !day.isToday && styles.calendarDayNumberDone,
+                          day.isToday && styles.calendarDayNumberToday,
+                          day.isFuture && styles.calendarDayNumberFuture,
+                        ]}
+                      >
+                        {day.dayNumber}
+                      </Text>
+                      {day.isCompleted && !day.isToday && (
+                        <View style={styles.calendarDoneDot}>
+                          <MaterialCommunityIcons name="check" size={9} color="#064E3B" />
+                        </View>
+                      )}
+                    </View>
+                    {day.isToday ? (
+                      <View style={styles.todayPill}>
+                        <Text style={styles.todayPillText}>DZIŚ</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.todayPillSpacer} />
+                    )}
+                  </View>
+                ))}
+              </View>
+            </LinearGradient>
+
+            {/* 2. KARTA: MODUŁ CZYSTEGO POWIETRZA */}
+            <LinearGradient
+              colors={['#00383F', '#002227']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.widgetCard}
+            >
+              <View style={styles.widgetHeaderRow}>
+                <View style={[styles.flameIconBox, { backgroundColor: 'rgba(35, 229, 219, 0.15)', borderColor: 'rgba(35, 229, 219, 0.3)' }]}>
+                  <MaterialCommunityIcons name="weather-windy" size={24} color="#23E5DB" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={styles.widgetTitle}>Czyste powietrze</Text>
+                    <View style={styles.liveGpsPill}>
+                      <View style={styles.liveGpsDot} />
+                      <Text style={styles.liveGpsText}>GPS NA ŻYWO</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.widgetSub} numberOfLines={1}>
+                    {cityLabel} • {airData?.aqiDescription || 'Monitorowanie jakości powietrza'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={loadAirQuality}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={styles.airRefreshBtn}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Odśwież jakość powietrza"
+                >
+                  {airLoading ? (
+                    <ActivityIndicator size="small" color="#23E5DB" />
+                  ) : (
+                    <MaterialCommunityIcons name="refresh" size={18} color="#23E5DB" />
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* Parametry czystości powietrza */}
+              <View style={styles.airMetricsRow}>
+                {/* Wskaźnik AQI */}
+                <View style={styles.airAqiBadgeBox}>
+                  <Text style={styles.airAqiVal}>{airData?.aqi ?? 30}</Text>
+                  <View style={{ marginLeft: 8 }}>
+                    <Text style={styles.airAqiLabel}>INDEKS AQI</Text>
+                    <Text style={[styles.airAqiStatusText, { color: airData?.aqiColor || '#34D399' }]}>
+                      {airData?.aqiLabel || 'Dobra'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Rozbicie na cząstki pyłu PM2.5, PM10, NO2 */}
+                <View style={styles.airPillsContainer}>
+                  <View style={styles.airPillItem}>
+                    <Text style={styles.airPillKey}>PM2.5</Text>
+                    <Text style={styles.airPillVal}>{airData?.pm25 ?? 9.9} <Text style={styles.airPillUnit}>µg/m³</Text></Text>
+                  </View>
+                  <View style={styles.airPillDivider} />
+                  <View style={styles.airPillItem}>
+                    <Text style={styles.airPillKey}>PM10</Text>
+                    <Text style={styles.airPillVal}>{airData?.pm10 ?? 11} <Text style={styles.airPillUnit}>µg/m³</Text></Text>
+                  </View>
+                  {airData?.no2 !== undefined && (
+                    <>
+                      <View style={styles.airPillDivider} />
+                      <View style={styles.airPillItem}>
+                        <Text style={styles.airPillKey}>NO₂</Text>
+                        <Text style={styles.airPillVal}>{airData.no2} <Text style={styles.airPillUnit}>µg/m³</Text></Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+              </View>
+            </LinearGradient>
           </View>
         </View>
 
@@ -1216,6 +1434,280 @@ const styles = StyleSheet.create({
     color: '#002F34',
     fontSize: 14,
     fontWeight: '700',
+  },
+
+  // TOP WIDGETS (SERIA & CZYSTE POWIETRZE)
+  topWidgetsSection: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingVertical: 14,
+  },
+  topWidgetsInner: {
+    maxWidth: 1240,
+    width: '100%',
+    marginHorizontal: 'auto',
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    gap: 16,
+    flexWrap: 'wrap',
+  },
+  widgetCard: {
+    flex: 1,
+    minWidth: 380,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    justifyContent: 'space-between',
+  },
+  widgetHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  flameIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(251, 191, 36, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  widgetTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#F8FAFC',
+  },
+  widgetHighlight: {
+    color: '#FDE68A',
+    fontWeight: '900',
+  },
+  widgetSub: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  calendarDateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(253, 230, 138, 0.25)',
+  },
+  calendarDateText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FDE68A',
+  },
+  weekCalendarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  calendarDayCol: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  calendarWeekdayLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#A7F3D0',
+    marginBottom: 4,
+  },
+  calendarWeekdayLabelToday: {
+    color: '#FDE68A',
+    fontWeight: '800',
+  },
+  calendarWeekdayLabelFuture: {
+    color: 'rgba(255, 255, 255, 0.35)',
+  },
+  calendarCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    position: 'relative',
+  },
+  calendarCircleDone: {
+    backgroundColor: '#059669',
+    borderColor: '#34D399',
+  },
+  calendarCircleToday: {
+    backgroundColor: '#F59E0B',
+    borderColor: '#FDE68A',
+    borderWidth: 2,
+    transform: [{ scale: 1.08 }],
+  },
+  calendarCircleFuture: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  calendarDayNumber: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  calendarDayNumberDone: {
+    color: '#FFFFFF',
+  },
+  calendarDayNumberToday: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+  },
+  calendarDayNumberFuture: {
+    color: 'rgba(255, 255, 255, 0.35)',
+  },
+  calendarDoneDot: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    backgroundColor: '#A7F3D0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  todayPill: {
+    marginTop: 4,
+    backgroundColor: 'rgba(245, 158, 11, 0.25)',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  todayPillText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#FDE68A',
+  },
+  todayPillSpacer: {
+    height: 16,
+  },
+
+  // AIR QUALITY SPECIFIC
+  liveGpsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+    gap: 5,
+  },
+  liveGpsDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  liveGpsText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#6EE7B7',
+    letterSpacing: 0.5,
+  },
+  airRefreshBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(35, 229, 219, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(35, 229, 219, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer' as any,
+  },
+  airMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    gap: 12,
+  },
+  airAqiBadgeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  airAqiVal: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  airAqiLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
+  },
+  airAqiStatusText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  airPillsContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 12,
+  },
+  airPillItem: {
+    alignItems: 'center',
+  },
+  airPillKey: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  airPillVal: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  airPillUnit: {
+    fontSize: 9,
+    color: '#94A3B8',
+    fontWeight: '400',
+  },
+  airPillDivider: {
+    width: 1,
+    height: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
 
   // 2. HERO SEARCH SECTION

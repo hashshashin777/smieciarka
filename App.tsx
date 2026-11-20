@@ -1467,6 +1467,7 @@ export default function App() {
             usersCount={effectiveUsersCount}
             userCoords={userCoords}
             adminSettings={adminSettings}
+            streakDays={streakDays}
           />
         ) : (
           <>
