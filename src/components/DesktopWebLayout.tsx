@@ -1962,10 +1962,6 @@ const styles = StyleSheet.create({
     minWidth: 220,
   },
   footerLogoBadge: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
     alignSelf: 'flex-start',
     marginBottom: 14,
   },
