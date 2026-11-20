@@ -395,7 +395,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 accessibilityRole="button"
                 accessibilityLabel="Dodaj nowe ogłoszenie"
               >
-                <MaterialCommunityIcons name="plus" size={20} color="#002F34" />
+                <MaterialCommunityIcons name="plus" size={20} color="#064E3B" />
                 <Text style={styles.addCtaButtonText}>Dodaj ogłoszenie</Text>
               </TouchableOpacity>
             </View>
@@ -1357,12 +1357,12 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
   },
 
-  // 1. TOP NAVBAR
+  // 1. TOP NAVBAR (Głęboki szmaragd Zero-Waste #064E3B)
   topNavbar: {
     width: '100%',
-    backgroundColor: '#002F34',
+    backgroundColor: '#064E3B',
     borderBottomWidth: 1,
-    borderBottomColor: '#002428',
+    borderBottomColor: '#043D2E',
     paddingVertical: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1436,7 +1436,7 @@ const styles = StyleSheet.create({
     cursor: 'pointer' as any,
   },
   addCtaButtonText: {
-    color: '#002F34',
+    color: '#064E3B',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -2437,9 +2437,9 @@ const styles = StyleSheet.create({
   // 5. FOOTER
   footerContainer: {
     width: '100%',
-    backgroundColor: '#002F34',
+    backgroundColor: '#064E3B',
     borderTopWidth: 1,
-    borderTopColor: '#002428',
+    borderTopColor: '#043D2E',
     paddingTop: 48,
     paddingBottom: 36,
     marginTop: 48,
