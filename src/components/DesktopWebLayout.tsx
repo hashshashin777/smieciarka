@@ -1160,7 +1160,7 @@ const styles = StyleSheet.create({
   bannerWrapper: {
     width: '100%',
     maxWidth: 960,
-    aspectRatio: 1024 / 170,
+    aspectRatio: 1024 / 200,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     overflow: 'hidden',
