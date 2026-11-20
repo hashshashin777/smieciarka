@@ -147,6 +147,9 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
     loadAirQuality();
   }, [loadAirQuality]);
 
+  // Widoczność modułów serii i czystego powietrza pod górną nawigacją (domyślnie ukryte)
+  const showTopStatusWidgets = false;
+
   const handleSearchSubmit = () => {
     onSearchChange(localSearch);
   };
@@ -399,160 +402,162 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
           </View>
         </View>
 
-        {/* MODUŁY WIDGETÓW GÓRNYCH: SERIA ZERO-WASTE & CZYSTE POWIETRZE */}
-        <View style={styles.topWidgetsSection}>
-          <View style={styles.topWidgetsInner}>
-            {/* 1. KARTA: MODUŁ SERII ZERO-WASTE */}
-            <LinearGradient
-              colors={['#064E3B', '#022C22']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.widgetCard}
-            >
-              <View style={styles.widgetHeaderRow}>
-                <View style={styles.flameIconBox}>
-                  <MaterialCommunityIcons name="fire" size={24} color="#FBBF24" />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.widgetTitle}>
-                    Seria: <Text style={styles.widgetHighlight}>{streakDays} {streakDays === 1 ? 'dzień' : 'dni'} z rzędu</Text>
-                  </Text>
-                  <Text style={styles.widgetSub}>
-                    {streakDays >= 5 ? 'Świetna regularność Zero-Waste!' : 'Odwiedzaj nas codziennie, by ratować przedmioty'}
-                  </Text>
-                </View>
-                <View style={styles.calendarDateBadge}>
-                  <MaterialCommunityIcons name="calendar-today" size={12} color="#FDE68A" style={{ marginRight: 4 }} />
-                  <Text style={styles.calendarDateText}>{todayFormatted}</Text>
-                </View>
-              </View>
-
-              {/* Tydzień kalendarzowy Pn - Nd */}
-              <View style={styles.weekCalendarRow}>
-                {calendarDays.map((day) => (
-                  <View key={day.label} style={styles.calendarDayCol}>
-                    <Text
-                      style={[
-                        styles.calendarWeekdayLabel,
-                        day.isToday && styles.calendarWeekdayLabelToday,
-                        day.isFuture && styles.calendarWeekdayLabelFuture,
-                      ]}
-                    >
-                      {day.label}
+        {/* MODUŁY WIDGETÓW GÓRNYCH (UKRYTE NA ŻYCZENIE) */}
+        {showTopStatusWidgets && (
+          <View style={styles.topWidgetsSection}>
+            <View style={styles.topWidgetsInner}>
+              {/* 1. KARTA: MODUŁ SERII ZERO-WASTE */}
+              <LinearGradient
+                colors={['#064E3B', '#022C22']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.widgetCard}
+              >
+                <View style={styles.widgetHeaderRow}>
+                  <View style={styles.flameIconBox}>
+                    <MaterialCommunityIcons name="fire" size={24} color="#FBBF24" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.widgetTitle}>
+                      Seria: <Text style={styles.widgetHighlight}>{streakDays} {streakDays === 1 ? 'dzień' : 'dni'} z rzędu</Text>
                     </Text>
-                    <View
-                      style={[
-                        styles.calendarCircle,
-                        day.isCompleted && !day.isToday && styles.calendarCircleDone,
-                        day.isToday && styles.calendarCircleToday,
-                        day.isFuture && styles.calendarCircleFuture,
-                      ]}
-                    >
+                    <Text style={styles.widgetSub}>
+                      {streakDays >= 5 ? 'Świetna regularność Zero-Waste!' : 'Odwiedzaj nas codziennie, by ratować przedmioty'}
+                    </Text>
+                  </View>
+                  <View style={styles.calendarDateBadge}>
+                    <MaterialCommunityIcons name="calendar-today" size={12} color="#FDE68A" style={{ marginRight: 4 }} />
+                    <Text style={styles.calendarDateText}>{todayFormatted}</Text>
+                  </View>
+                </View>
+
+                {/* Tydzień kalendarzowy Pn - Nd */}
+                <View style={styles.weekCalendarRow}>
+                  {calendarDays.map((day) => (
+                    <View key={day.label} style={styles.calendarDayCol}>
                       <Text
                         style={[
-                          styles.calendarDayNumber,
-                          day.isCompleted && !day.isToday && styles.calendarDayNumberDone,
-                          day.isToday && styles.calendarDayNumberToday,
-                          day.isFuture && styles.calendarDayNumberFuture,
+                          styles.calendarWeekdayLabel,
+                          day.isToday && styles.calendarWeekdayLabelToday,
+                          day.isFuture && styles.calendarWeekdayLabelFuture,
                         ]}
                       >
-                        {day.dayNumber}
+                        {day.label}
                       </Text>
-                      {day.isCompleted && !day.isToday && (
-                        <View style={styles.calendarDoneDot}>
-                          <MaterialCommunityIcons name="check" size={9} color="#064E3B" />
+                      <View
+                        style={[
+                          styles.calendarCircle,
+                          day.isCompleted && !day.isToday && styles.calendarCircleDone,
+                          day.isToday && styles.calendarCircleToday,
+                          day.isFuture && styles.calendarCircleFuture,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.calendarDayNumber,
+                            day.isCompleted && !day.isToday && styles.calendarDayNumberDone,
+                            day.isToday && styles.calendarDayNumberToday,
+                            day.isFuture && styles.calendarDayNumberFuture,
+                          ]}
+                        >
+                          {day.dayNumber}
+                        </Text>
+                        {day.isCompleted && !day.isToday && (
+                          <View style={styles.calendarDoneDot}>
+                            <MaterialCommunityIcons name="check" size={9} color="#064E3B" />
+                          </View>
+                        )}
+                      </View>
+                      {day.isToday ? (
+                        <View style={styles.todayPill}>
+                          <Text style={styles.todayPillText}>DZIŚ</Text>
                         </View>
+                      ) : (
+                        <View style={styles.todayPillSpacer} />
                       )}
                     </View>
-                    {day.isToday ? (
-                      <View style={styles.todayPill}>
-                        <Text style={styles.todayPillText}>DZIŚ</Text>
+                  ))}
+                </View>
+              </LinearGradient>
+
+              {/* 2. KARTA: MODUŁ CZYSTEGO POWIETRZA */}
+              <LinearGradient
+                colors={['#00383F', '#002227']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.widgetCard}
+              >
+                <View style={styles.widgetHeaderRow}>
+                  <View style={[styles.flameIconBox, { backgroundColor: 'rgba(35, 229, 219, 0.15)', borderColor: 'rgba(35, 229, 219, 0.3)' }]}>
+                    <MaterialCommunityIcons name="weather-windy" size={24} color="#23E5DB" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={styles.widgetTitle}>Czyste powietrze</Text>
+                      <View style={styles.liveGpsPill}>
+                        <View style={styles.liveGpsDot} />
+                        <Text style={styles.liveGpsText}>GPS NA ŻYWO</Text>
                       </View>
-                    ) : (
-                      <View style={styles.todayPillSpacer} />
-                    )}
-                  </View>
-                ))}
-              </View>
-            </LinearGradient>
-
-            {/* 2. KARTA: MODUŁ CZYSTEGO POWIETRZA */}
-            <LinearGradient
-              colors={['#00383F', '#002227']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.widgetCard}
-            >
-              <View style={styles.widgetHeaderRow}>
-                <View style={[styles.flameIconBox, { backgroundColor: 'rgba(35, 229, 219, 0.15)', borderColor: 'rgba(35, 229, 219, 0.3)' }]}>
-                  <MaterialCommunityIcons name="weather-windy" size={24} color="#23E5DB" />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={styles.widgetTitle}>Czyste powietrze</Text>
-                    <View style={styles.liveGpsPill}>
-                      <View style={styles.liveGpsDot} />
-                      <Text style={styles.liveGpsText}>GPS NA ŻYWO</Text>
                     </View>
-                  </View>
-                  <Text style={styles.widgetSub} numberOfLines={1}>
-                    {cityLabel} • {airData?.aqiDescription || 'Monitorowanie jakości powietrza'}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={loadAirQuality}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  style={styles.airRefreshBtn}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel="Odśwież jakość powietrza"
-                >
-                  {airLoading ? (
-                    <ActivityIndicator size="small" color="#23E5DB" />
-                  ) : (
-                    <MaterialCommunityIcons name="refresh" size={18} color="#23E5DB" />
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              {/* Parametry czystości powietrza */}
-              <View style={styles.airMetricsRow}>
-                {/* Wskaźnik AQI */}
-                <View style={styles.airAqiBadgeBox}>
-                  <Text style={styles.airAqiVal}>{airData?.aqi ?? 30}</Text>
-                  <View style={{ marginLeft: 8 }}>
-                    <Text style={styles.airAqiLabel}>INDEKS AQI</Text>
-                    <Text style={[styles.airAqiStatusText, { color: airData?.aqiColor || '#34D399' }]}>
-                      {airData?.aqiLabel || 'Dobra'}
+                    <Text style={styles.widgetSub} numberOfLines={1}>
+                      {cityLabel} • {airData?.aqiDescription || 'Monitorowanie jakości powietrza'}
                     </Text>
                   </View>
+                  <TouchableOpacity
+                    onPress={loadAirQuality}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    style={styles.airRefreshBtn}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Odśwież jakość powietrza"
+                  >
+                    {airLoading ? (
+                      <ActivityIndicator size="small" color="#23E5DB" />
+                    ) : (
+                      <MaterialCommunityIcons name="refresh" size={18} color="#23E5DB" />
+                    )}
+                  </TouchableOpacity>
                 </View>
 
-                {/* Rozbicie na cząstki pyłu PM2.5, PM10, NO2 */}
-                <View style={styles.airPillsContainer}>
-                  <View style={styles.airPillItem}>
-                    <Text style={styles.airPillKey}>PM2.5</Text>
-                    <Text style={styles.airPillVal}>{airData?.pm25 ?? 9.9} <Text style={styles.airPillUnit}>µg/m³</Text></Text>
+                {/* Parametry czystości powietrza */}
+                <View style={styles.airMetricsRow}>
+                  {/* Wskaźnik AQI */}
+                  <View style={styles.airAqiBadgeBox}>
+                    <Text style={styles.airAqiVal}>{airData?.aqi ?? 30}</Text>
+                    <View style={{ marginLeft: 8 }}>
+                      <Text style={styles.airAqiLabel}>INDEKS AQI</Text>
+                      <Text style={[styles.airAqiStatusText, { color: airData?.aqiColor || '#34D399' }]}>
+                        {airData?.aqiLabel || 'Dobra'}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.airPillDivider} />
-                  <View style={styles.airPillItem}>
-                    <Text style={styles.airPillKey}>PM10</Text>
-                    <Text style={styles.airPillVal}>{airData?.pm10 ?? 11} <Text style={styles.airPillUnit}>µg/m³</Text></Text>
+
+                  {/* Rozbicie na cząstki pyłu PM2.5, PM10, NO2 */}
+                  <View style={styles.airPillsContainer}>
+                    <View style={styles.airPillItem}>
+                      <Text style={styles.airPillKey}>PM2.5</Text>
+                      <Text style={styles.airPillVal}>{airData?.pm25 ?? 9.9} <Text style={styles.airPillUnit}>µg/m³</Text></Text>
+                    </View>
+                    <View style={styles.airPillDivider} />
+                    <View style={styles.airPillItem}>
+                      <Text style={styles.airPillKey}>PM10</Text>
+                      <Text style={styles.airPillVal}>{airData?.pm10 ?? 11} <Text style={styles.airPillUnit}>µg/m³</Text></Text>
+                    </View>
+                    {airData?.no2 !== undefined && (
+                      <>
+                        <View style={styles.airPillDivider} />
+                        <View style={styles.airPillItem}>
+                          <Text style={styles.airPillKey}>NO₂</Text>
+                          <Text style={styles.airPillVal}>{airData.no2} <Text style={styles.airPillUnit}>µg/m³</Text></Text>
+                        </View>
+                      </>
+                    )}
                   </View>
-                  {airData?.no2 !== undefined && (
-                    <>
-                      <View style={styles.airPillDivider} />
-                      <View style={styles.airPillItem}>
-                        <Text style={styles.airPillKey}>NO₂</Text>
-                        <Text style={styles.airPillVal}>{airData.no2} <Text style={styles.airPillUnit}>µg/m³</Text></Text>
-                      </View>
-                    </>
-                  )}
                 </View>
-              </View>
-            </LinearGradient>
+              </LinearGradient>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* 2. HERO SEARCH SECTION (Białe czyste tło z panoramicznym banerem i wyszukiwarką) */}
         <View style={styles.heroSearchSection}>
