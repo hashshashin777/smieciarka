@@ -233,9 +233,14 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
         {/* 2. HERO SEARCH SECTION (OLX Style) */}
         <View style={styles.heroSearchSection}>
           <View style={styles.heroSearchInner}>
-            <Text style={styles.heroHeading}>
-              Daj przedmiotom drugie życie. Wystawki i darmowe skarby w Twojej okolicy.
-            </Text>
+            {/* Featured Wide Banner above Search */}
+            <View style={styles.bannerWrapper}>
+              <Image
+                source={require('../assets/ad_banner.webp')}
+                style={styles.heroBannerImage}
+                resizeMode="contain"
+              />
+            </View>
 
             <View style={styles.searchBarBox}>
               {/* Field 1: Search query */}
@@ -396,15 +401,6 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
       {/* 4. MAIN CONTENT CONTAINER */}
       <main style={{ width: '100%', display: 'flex', justifyContent: 'center' } as any}>
         <View style={styles.mainContentWrapper}>
-          {/* Featured Wide Banner */}
-          <View style={styles.bannerWrapper}>
-            <Image
-              source={require('../assets/ad_banner.webp')}
-              style={styles.heroBannerImage}
-              resizeMode="contain"
-            />
-          </View>
-
           {/* Navigation Tabs (All, Wystawki, Do oddania, Tablica, Mapa, Zapisane) */}
           <View style={styles.tabsNavRow}>
             <View style={styles.tabsLeftGroup}>
@@ -1159,16 +1155,17 @@ const styles = StyleSheet.create({
   },
   bannerWrapper: {
     width: '100%',
+    maxWidth: 960,
     aspectRatio: 1024 / 341,
     backgroundColor: '#002722',
     borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 24,
+    marginBottom: 20,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 10,
   },
   heroBannerImage: {
