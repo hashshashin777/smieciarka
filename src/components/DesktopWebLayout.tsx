@@ -224,8 +224,8 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
       contentContainerStyle={styles.pageContent}
       showsVerticalScrollIndicator={true}
     >
-      {/* 1. TOP NAVBAR (Ciemny petrol #002F34 ze spójnym podświetleniem #23E5DB) */}
-      <header style={{ width: '100%' } as any}>
+      {/* 1. TOP NAVBAR (Głęboki szmaragd z efektem Glassmorphism) */}
+      <header style={{ width: '100%', position: 'sticky', top: 0, zIndex: 100 } as any}>
         <View style={styles.topNavbar}>
           <View style={styles.topNavbarInner}>
             {/* Logo */}
@@ -1361,20 +1361,23 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
   },
 
-  // 1. TOP NAVBAR (Głęboki szmaragd Zero-Waste #064E3B)
+  // 1. TOP NAVBAR (Głęboki szmaragd Zero-Waste z efektem Glassmorphism)
   topNavbar: {
     width: '100%',
-    backgroundColor: '#064E3B',
+    backgroundColor: 'rgba(6, 78, 59, 0.82)',
+    backdropFilter: 'blur(16px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(16px) saturate(180%)',
     borderBottomWidth: 1,
-    borderBottomColor: '#043D2E',
+    borderBottomColor: 'rgba(255, 255, 255, 0.12)',
     paddingVertical: 6,
     minHeight: 74,
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-  },
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.20)',
+  } as any,
   topNavbarInner: {
     maxWidth: 1240,
     width: '100%',
@@ -1413,9 +1416,10 @@ const styles = StyleSheet.create({
     cursor: 'pointer' as any,
   },
   navLinkActive: {
-    backgroundColor: 'rgba(35, 229, 219, 0.15)',
-    borderColor: 'rgba(35, 229, 219, 0.35)',
-  },
+    backgroundColor: 'rgba(35, 229, 219, 0.20)',
+    borderColor: 'rgba(35, 229, 219, 0.45)',
+    backdropFilter: 'blur(8px)',
+  } as any,
   navLinkText: {
     color: '#FFFFFF',
     fontSize: 14,
