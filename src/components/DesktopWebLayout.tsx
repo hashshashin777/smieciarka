@@ -77,7 +77,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
   userCoords,
   adminSettings,
 }) => {
-  const [activeTab, setActiveTab] = useState<DesktopTab>('all');
+  const [activeTab, setActiveTab] = useState<DesktopTab>('map');
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
   const handleSearchSubmit = () => {
@@ -155,7 +155,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
             <TouchableOpacity
               style={styles.logoContainer}
               onPress={() => {
-                handleTabChange('all');
+                handleTabChange('map');
                 onSelectCategory(null);
                 onSearchChange('');
                 setLocalSearch('');
@@ -195,16 +195,39 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 </Text>
               </TouchableOpacity>
 
+              {/* Widok mapy w miejsce ukrytego logowania */}
               <TouchableOpacity
-                style={styles.navLink}
-                onPress={onOpenAuth}
+                style={[styles.navLink, activeTab === 'map' && styles.navLinkActive]}
+                onPress={() => handleTabChange('map')}
                 activeOpacity={0.8}
               >
-                <MaterialCommunityIcons name="account-circle-outline" size={22} color="#FFFFFF" />
-                <Text style={styles.navLinkText}>
-                  {currentUser ? currentUser.name || 'Twoje konto' : 'Zaloguj się'}
+                <MaterialCommunityIcons
+                  name="map-outline"
+                  size={20}
+                  color={activeTab === 'map' ? '#23E5DB' : '#FFFFFF'}
+                />
+                <Text
+                  style={[
+                    styles.navLinkText,
+                    activeTab === 'map' && styles.navLinkTextActive,
+                  ]}
+                >
+                  Widok mapy
                 </Text>
               </TouchableOpacity>
+
+              {currentUser && (
+                <TouchableOpacity
+                  style={styles.navLink}
+                  onPress={onOpenAuth}
+                  activeOpacity={0.8}
+                >
+                  <MaterialCommunityIcons name="account-circle-outline" size={22} color="#FFFFFF" />
+                  <Text style={styles.navLinkText}>
+                    {currentUser.name || 'Twoje konto'}
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               {currentUser?.role === 'admin' && (
                 <TouchableOpacity
@@ -605,18 +628,23 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 {/* Left/Main Map iframe */}
                 <View style={styles.mapIframeContainer}>
                   {Platform.OS === 'web' ? (
-                    <iframe
-                      title="Mapa Wystawka"
-                      src={`https://www.openstreetmap.org/export/embed.html?bbox=22.45%2C51.20%2C22.65%2C51.30&layer=mapnik&marker=${
-                        selectedCity?.latitude || 51.2465
-                      }%2C${selectedCity?.longitude || 22.5684}`}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        border: 'none',
-                        borderRadius: 16,
-                      } as any}
-                    />
+                    (() => {
+                      const lat = selectedCity?.latitude || 51.2465;
+                      const lng = selectedCity?.longitude || 22.5684;
+                      const bbox = `${(lng - 0.09).toFixed(4)}%2C${(lat - 0.05).toFixed(4)}%2C${(lng + 0.09).toFixed(4)}%2C${(lat + 0.05).toFixed(4)}`;
+                      return (
+                        <iframe
+                          title="Mapa Wystawka"
+                          src={`https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat}%2C${lng}`}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            border: 'none',
+                            borderRadius: 16,
+                          } as any}
+                        />
+                      );
+                    })()
                   ) : null}
                 </View>
 
@@ -956,10 +984,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 8,
   },
+  navLinkActive: {
+    backgroundColor: 'rgba(35, 229, 219, 0.15)',
+  },
   navLinkText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  navLinkTextActive: {
+    color: '#23E5DB',
+    fontWeight: '700',
   },
   adminPill: {
     backgroundColor: 'rgba(251, 191, 36, 0.15)',
