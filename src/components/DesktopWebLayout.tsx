@@ -298,23 +298,23 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
             {/* Quick stats pill row under search */}
             <View style={styles.heroStatsRow}>
               <View style={styles.heroStatItem}>
-                <MaterialCommunityIcons name="account-group-outline" size={16} color="#34D399" />
+                <MaterialCommunityIcons name="account-group-outline" size={16} color="#059669" />
                 <Text style={styles.heroStatText}>
-                  <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>{usersCount}</Text> sąsiadów online
+                  <Text style={{ fontWeight: '700', color: '#0F172A' }}>{usersCount}</Text> sąsiadów online
                 </Text>
               </View>
               <View style={styles.heroStatDot} />
               <View style={styles.heroStatItem}>
-                <MaterialCommunityIcons name="recycle" size={16} color="#34D399" />
+                <MaterialCommunityIcons name="recycle" size={16} color="#059669" />
                 <Text style={styles.heroStatText}>
-                  <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>{ecoStats.itemsRescued}</Text> uratowanych rzeczy
+                  <Text style={{ fontWeight: '700', color: '#0F172A' }}>{ecoStats.itemsRescued}</Text> uratowanych rzeczy
                 </Text>
               </View>
               <View style={styles.heroStatDot} />
               <View style={styles.heroStatItem}>
-                <MaterialCommunityIcons name="leaf" size={16} color="#34D399" />
+                <MaterialCommunityIcons name="leaf" size={16} color="#059669" />
                 <Text style={styles.heroStatText}>
-                  <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>{ecoStats.co2SavedKg} kg</Text> zaoszczędzonego CO₂
+                  <Text style={{ fontWeight: '700', color: '#0F172A' }}>{ecoStats.co2SavedKg} kg</Text> zaoszczędzonego CO₂
                 </Text>
               </View>
             </View>
@@ -988,9 +988,11 @@ const styles = StyleSheet.create({
   // 2. HERO SEARCH SECTION
   heroSearchSection: {
     width: '100%',
-    backgroundColor: '#002F34',
-    paddingTop: 16,
-    paddingBottom: 36,
+    backgroundColor: '#FFFFFF',
+    paddingTop: 20,
+    paddingBottom: 28,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
   heroSearchInner: {
     maxWidth: 1240,
@@ -1000,7 +1002,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroHeading: {
-    color: '#FFFFFF',
+    color: '#0F172A',
     fontSize: 26,
     fontWeight: '700',
     marginBottom: 20,
@@ -1011,13 +1013,15 @@ const styles = StyleSheet.create({
     maxWidth: 960,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#002F34',
     flexDirection: 'row',
     alignItems: 'center',
     padding: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
   },
   searchInputWrapper: {
     flex: 1,
@@ -1078,10 +1082,10 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: '#CBD5E1',
   },
   heroStatText: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: 13,
   },
 
@@ -1157,7 +1161,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 960,
     aspectRatio: 1024 / 341,
-    backgroundColor: '#002722',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     overflow: 'hidden',
     marginBottom: 20,
@@ -1165,8 +1169,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
   },
   heroBannerImage: {
     width: '100%',
