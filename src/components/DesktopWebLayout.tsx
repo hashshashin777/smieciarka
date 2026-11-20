@@ -401,7 +401,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
             <Image
               source={require('../assets/ad_banner.webp')}
               style={styles.heroBannerImage}
-              resizeMode="cover"
+              resizeMode="contain"
             />
           </View>
 
@@ -1160,7 +1160,6 @@ const styles = StyleSheet.create({
   bannerWrapper: {
     width: '100%',
     aspectRatio: 1024 / 341,
-    maxHeight: 320,
     backgroundColor: '#002722',
     borderRadius: 16,
     overflow: 'hidden',
