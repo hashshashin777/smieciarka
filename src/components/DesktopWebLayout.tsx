@@ -172,31 +172,37 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
 
             {/* Right Action Menu */}
             <View style={styles.topNavActions}>
+              {/* Ogłoszenia */}
               <TouchableOpacity
-                style={styles.navLink}
-                onPress={() => handleTabChange('board')}
-                activeOpacity={0.8}
-              >
-                <MaterialCommunityIcons name="forum-outline" size={20} color="#FFFFFF" />
-                <Text style={styles.navLinkText}>Tablica sąsiedzka</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.navLink}
-                onPress={() => handleTabChange('saved')}
+                style={[
+                  styles.navLink,
+                  (activeTab === 'all' || activeTab === 'wystawka' || activeTab === 'oddam') &&
+                    styles.navLinkActive,
+                ]}
+                onPress={() => handleTabChange('all')}
                 activeOpacity={0.8}
               >
                 <MaterialCommunityIcons
-                  name={savedItemIds.length > 0 ? 'heart' : 'heart-outline'}
+                  name="format-list-bulleted"
                   size={20}
-                  color={savedItemIds.length > 0 ? '#EF4444' : '#FFFFFF'}
+                  color={
+                    activeTab === 'all' || activeTab === 'wystawka' || activeTab === 'oddam'
+                      ? '#23E5DB'
+                      : '#FFFFFF'
+                  }
                 />
-                <Text style={styles.navLinkText}>
-                  Zapisane ({savedItemIds.length + savedBoardPostIds.length})
+                <Text
+                  style={[
+                    styles.navLinkText,
+                    (activeTab === 'all' || activeTab === 'wystawka' || activeTab === 'oddam') &&
+                      styles.navLinkTextActive,
+                  ]}
+                >
+                  Ogłoszenia
                 </Text>
               </TouchableOpacity>
 
-              {/* Widok mapy w miejsce ukrytego logowania */}
+              {/* Widok mapy */}
               <TouchableOpacity
                 style={[styles.navLink, activeTab === 'map' && styles.navLinkActive]}
                 onPress={() => handleTabChange('map')}
@@ -214,6 +220,54 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                   ]}
                 >
                   Widok mapy
+                </Text>
+              </TouchableOpacity>
+
+              {/* Tablica sąsiedzka */}
+              <TouchableOpacity
+                style={[styles.navLink, activeTab === 'board' && styles.navLinkActive]}
+                onPress={() => handleTabChange('board')}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons
+                  name="forum-outline"
+                  size={20}
+                  color={activeTab === 'board' ? '#23E5DB' : '#FFFFFF'}
+                />
+                <Text
+                  style={[
+                    styles.navLinkText,
+                    activeTab === 'board' && styles.navLinkTextActive,
+                  ]}
+                >
+                  Tablica sąsiedzka
+                </Text>
+              </TouchableOpacity>
+
+              {/* Zapisane */}
+              <TouchableOpacity
+                style={[styles.navLink, activeTab === 'saved' && styles.navLinkActive]}
+                onPress={() => handleTabChange('saved')}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons
+                  name={savedItemIds.length > 0 ? 'heart' : 'heart-outline'}
+                  size={20}
+                  color={
+                    savedItemIds.length > 0
+                      ? '#EF4444'
+                      : activeTab === 'saved'
+                      ? '#23E5DB'
+                      : '#FFFFFF'
+                  }
+                />
+                <Text
+                  style={[
+                    styles.navLinkText,
+                    activeTab === 'saved' && styles.navLinkTextActive,
+                  ]}
+                >
+                  Zapisane ({savedItemIds.length + savedBoardPostIds.length})
                 </Text>
               </TouchableOpacity>
 
@@ -983,12 +1037,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 8,
+    paddingVertical: 7,
     paddingHorizontal: 10,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   navLinkActive: {
     backgroundColor: 'rgba(35, 229, 219, 0.15)',
+    borderColor: 'rgba(35, 229, 219, 0.35)',
   },
   navLinkText: {
     color: '#FFFFFF',
