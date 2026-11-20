@@ -1,6 +1,6 @@
 import { ImageSourcePropType } from 'react-native';
 
-export type BannerSlotId = 'home' | 'map' | 'list' | 'board' | 'saved';
+export type BannerSlotId = 'home' | 'web' | 'map' | 'list' | 'board' | 'saved';
 
 export type CustomBannerImages = Partial<Record<BannerSlotId, string>>;
 
@@ -15,10 +15,17 @@ export interface BannerSlotMeta {
 export const BANNER_SLOTS: BannerSlotMeta[] = [
   {
     id: 'home',
-    label: 'Baner na Pulpicie',
-    locationHint: 'Główny ekran Pulpit (nad wyszukiwarką)',
-    defaultLabel: 'Domyślny baner Wystawki',
-    defaultSource: require('../assets/ad_banner.webp'),
+    label: 'Baner na Pulpicie (Aplikacja)',
+    locationHint: 'Pulpit w aplikacji mobilnej (nad wyszukiwarką)',
+    defaultLabel: 'Domyślny baner aplikacji mobilnej',
+    defaultSource: require('../assets/mobile_ad_banner.webp'),
+  },
+  {
+    id: 'web',
+    label: 'Baner na Stronie Głównej (WWW)',
+    locationHint: 'Strona główna WWW na komputerach (nad wyszukiwarką)',
+    defaultLabel: 'Domyślny baner strony WWW (1024×200)',
+    defaultSource: require('../assets/web_ad_banner.webp'),
   },
   {
     id: 'map',

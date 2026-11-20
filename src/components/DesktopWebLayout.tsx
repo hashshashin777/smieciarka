@@ -15,6 +15,7 @@ import { CATEGORIES, THEME } from '../constants/categories';
 import { CityOption, getCityDisplayLabel } from '../constants/cities';
 import { calculateDistance, formatRelativeTime, safeOpenUrl } from '../utils/helpers';
 import { EcoStats, AdminSettings } from '../services/storageCache';
+import { resolveBannerSource } from '../constants/banners';
 
 interface DesktopWebLayoutProps {
   items: PostItem[];
@@ -257,13 +258,15 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
         <View style={styles.heroSearchSection}>
           <View style={styles.heroSearchInner}>
             {/* Featured Wide Banner above Search */}
-            <View style={styles.bannerWrapper}>
-              <Image
-                source={require('../assets/ad_banner.webp')}
-                style={styles.heroBannerImage}
-                resizeMode="contain"
-              />
-            </View>
+            {adminSettings?.adsEnabled !== false && (
+              <View style={styles.bannerWrapper}>
+                <Image
+                  source={resolveBannerSource('web', adminSettings?.customBanners)}
+                  style={styles.heroBannerImage}
+                  resizeMode="contain"
+                />
+              </View>
+            )}
 
             <View style={styles.searchBarBox}>
               {/* Field 1: Search query */}

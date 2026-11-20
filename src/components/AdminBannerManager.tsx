@@ -53,7 +53,7 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
-        aspect: [4, 1],
+        aspect: slotId === 'web' ? [5, 1] : [4, 1],
         quality: 0.85,
       });
 
