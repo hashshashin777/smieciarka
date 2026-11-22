@@ -32,6 +32,7 @@ import {
 } from '../services/storageCache';
 import { resolveBannerSource, DEFAULT_WEB_BANNERS } from '../constants/banners';
 import { fetchAirQuality, AirQualityData } from '../services/airQuality';
+import { WebLeafletMap } from './WebLeafletMap';
 
 
 
@@ -273,7 +274,6 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
   // Dynamic OpenStreetMap viewport calculation
   const mapCenterLat = selectedCity?.latitude || 51.2465;
   const mapCenterLng = selectedCity?.longitude || 22.5684;
-  const osmBbox = `${(mapCenterLng - 0.09).toFixed(4)}%2C${(mapCenterLat - 0.05).toFixed(4)}%2C${(mapCenterLng + 0.09).toFixed(4)}%2C${(mapCenterLat + 0.05).toFixed(4)}`;
 
   return (
     <ScrollView
@@ -1112,18 +1112,19 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
               </View>
 
               <View style={styles.mapSplitLayout}>
-                {/* Lewa strona: OpenStreetMap iframe wycentrowana na wybranym mieście */}
+                {/* Lewa strona: Interaktywna mapa Leaflet z naniesionymi ogłoszeniami */}
                 <View style={styles.mapIframeContainer}>
                   {Platform.OS === 'web' ? (
-                    <iframe
-                      title="Interaktywna Mapa Wystawka"
-                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${osmBbox}&layer=mapnik&marker=${mapCenterLat}%2C${mapCenterLng}`}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        border: 'none',
-                        borderRadius: 16,
-                      } as any}
+                    <WebLeafletMap
+                      items={displayedItems}
+                      onSelectItem={(item) => {
+                        if (item) onOpenDetail(item);
+                      }}
+                      onOpenDetail={onOpenDetail}
+                      centerLat={mapCenterLat}
+                      centerLng={mapCenterLng}
+                      userCoords={userCoords}
+                      style={{ width: '100%', height: '100%', borderRadius: 16 }}
                     />
                   ) : null}
                 </View>

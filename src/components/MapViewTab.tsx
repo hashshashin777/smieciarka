@@ -14,6 +14,7 @@ import { THEME, APP_FONT } from '../constants/categories';
 import { CityOption, getCityDisplayLabel } from '../constants/cities';
 import { calculateDistance } from '../utils/helpers';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WebLeafletMap } from './WebLeafletMap';
 
 // Dynamically handle react-native-maps for native platforms
 let MapView: React.ComponentType<any> | null = null;
@@ -173,127 +174,88 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
     onRecenterGPS();
   };
 
-  if (Platform.OS === 'web' || !MapView || !Marker) {
-    return (
-      <View style={styles.webFallbackContainer}>
-        {onOpenCityPicker && (
-          <TouchableOpacity
-            style={styles.webCityPill}
-            onPress={onOpenCityPicker}
-            activeOpacity={0.85}
-          >
-            <MaterialCommunityIcons
-              name={selectedCity ? 'city-variant-outline' : 'crosshairs-gps'}
-              size={18}
-              color="#059669"
-            />
-            <Text style={styles.cityFabText}>
-              {getCityDisplayLabel(selectedCity, gpsCityName)}
-            </Text>
-            <MaterialCommunityIcons name="chevron-down" size={18} color="#047857" />
-          </TouchableOpacity>
-        )}
-        <MaterialCommunityIcons name="map-legend" size={54} color={THEME.primary} />
-        <Text style={styles.fallbackTitle}>Mapa wystawek i znalezisk</Text>
-        <Text style={styles.fallbackDesc}>
-          Natywny moduł map Apple/Google Maps działa na urządzeniu mobilnym (iPhone / Android).
-        </Text>
-        <View style={styles.fallbackItemsList}>
-          <Text style={styles.fallbackListHeader}>Pinezki aktywne w okolicy ({items.length}):</Text>
-          {items.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={styles.fallbackPinItem}
-              onPress={() => onOpenDetail(item)}
-            >
-              <View
-                style={[
-                  styles.markerIcon,
-                  item.type === 'wystawka' ? styles.markerWystawka : styles.markerOddam,
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name={item.type === 'wystawka' ? 'dump-truck' : 'gift'}
-                  size={14}
-                  color="#FFFFFF"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.fallbackItemTitle}>{item.title}</Text>
-                <Text style={styles.fallbackItemSub}>{item.location.address || 'Ulica'}</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={20} color="#94A3B8" />
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-    );
-  }
+  const isWeb = Platform.OS === 'web' || !MapView || !Marker;
+  const NativeMapView = (MapView || View) as React.ComponentType<any>;
+  const NativeMapMarker = (Marker || View) as React.ComponentType<any>;
 
-  const ActiveMapView = MapView;
-  const ActiveMapMarker = Marker;
+  const centerLat = selectedCity?.latitude || userCoords?.latitude || 51.2465;
+  const centerLng = selectedCity?.longitude || userCoords?.longitude || 22.5684;
 
   return (
     <View style={[styles.container, isDark && styles.containerDark]}>
-      <ActiveMapView
-        ref={mapRef}
-        style={styles.map}
-        initialRegion={defaultRegion}
-        showsUserLocation
-        showsMyLocationButton={false}
-        userInterfaceStyle="light"
-        customMapStyle={[]}
-        onRegionChangeComplete={(newRegion: any) => setRegion(newRegion)}
-      >
-        {clusters.map((cluster) => {
-          if (cluster.isCluster) {
+      {isWeb ? (
+        <WebLeafletMap
+          items={items}
+          selectedItem={selectedItem}
+          onSelectItem={onSelectItem}
+          onOpenDetail={onOpenDetail}
+          centerLat={centerLat}
+          centerLng={centerLng}
+          userCoords={userCoords}
+          isDark={isDark}
+          style={styles.map}
+        />
+      ) : (
+        <NativeMapView
+          ref={mapRef}
+          style={styles.map}
+          initialRegion={defaultRegion}
+          showsUserLocation
+          showsMyLocationButton={false}
+          userInterfaceStyle="light"
+          customMapStyle={[]}
+          onRegionChangeComplete={(newRegion: any) => setRegion(newRegion)}
+        >
+          {clusters.map((cluster) => {
+            if (cluster.isCluster) {
+              return (
+                <NativeMapMarker
+                  key={cluster.id}
+                  coordinate={{
+                    latitude: cluster.latitude,
+                    longitude: cluster.longitude,
+                  }}
+                  onPress={() => handleClusterPress(cluster)}
+                  tracksViewChanges={false}
+                >
+                  <View style={styles.clusterMarker}>
+                    <MaterialCommunityIcons name="layers-triple-outline" size={13} color="#FFFFFF" />
+                    <Text style={styles.clusterText}>{cluster.count}</Text>
+                  </View>
+                </NativeMapMarker>
+              );
+            }
+
+            const item = cluster.items[0];
+            const isWystawka = item.type === 'wystawka';
             return (
-              <ActiveMapMarker
-                key={cluster.id}
+              <NativeMapMarker
+                key={item.id}
                 coordinate={{
-                  latitude: cluster.latitude,
-                  longitude: cluster.longitude,
+                  latitude: item.location.latitude,
+                  longitude: item.location.longitude,
                 }}
-                onPress={() => handleClusterPress(cluster)}
+                onPress={() => onSelectItem(item)}
                 tracksViewChanges={false}
               >
-                <View style={styles.clusterMarker}>
-                  <MaterialCommunityIcons name="layers-triple-outline" size={13} color="#FFFFFF" />
-                  <Text style={styles.clusterText}>{cluster.count}</Text>
+                <View
+                  style={[
+                    styles.customMarker,
+                    isWystawka ? styles.markerWystawka : styles.markerOddam,
+                    selectedItem?.id === item.id && styles.selectedMarker,
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={isWystawka ? 'dump-truck' : 'gift'}
+                    size={16}
+                    color="#FFFFFF"
+                  />
                 </View>
-              </ActiveMapMarker>
+              </NativeMapMarker>
             );
-          }
-
-          const item = cluster.items[0];
-          const isWystawka = item.type === 'wystawka';
-          return (
-            <ActiveMapMarker
-              key={item.id}
-              coordinate={{
-                latitude: item.location.latitude,
-                longitude: item.location.longitude,
-              }}
-              onPress={() => onSelectItem(item)}
-              tracksViewChanges={false}
-            >
-              <View
-                style={[
-                  styles.customMarker,
-                  isWystawka ? styles.markerWystawka : styles.markerOddam,
-                  selectedItem?.id === item.id && styles.selectedMarker,
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name={isWystawka ? 'dump-truck' : 'gift'}
-                  size={16}
-                  color="#FFFFFF"
-                />
-              </View>
-            </ActiveMapMarker>
-          );
-        })}
-      </ActiveMapView>
+          })}
+        </NativeMapView>
+      )}
 
       {/* Informacja o braku ogłoszeń na mapie (Cold Start) */}
       {items.length === 0 && (
