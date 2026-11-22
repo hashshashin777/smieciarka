@@ -68,37 +68,91 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
     (slot) => getCustomBannerList(slot.id, customBanners).length > 0
   ).length;
 
-  // Przetwarzanie plików (z drag&drop lub inputu file na webie)
+  // Przetwarzanie plików (z drag&drop lub inputu file na webie) z kompresją canvas
   const processUploadedFiles = async (slotId: BannerSlotId, files: FileList | File[]) => {
     const fileArray = Array.from(files).filter((f) => f.type.startsWith('image/'));
     if (fileArray.length === 0) {
-      Alert.alert('Błędny format', 'Przeciągnij pliki graficzne (np. PNG, JPG, WEBP, GIF).');
+      Alert.alert('Błędny format', 'Wybierz lub przeciągnij pliki graficzne (np. PNG, JPG, WEBP, GIF).');
       return;
     }
 
     setUploadingSlot(slotId);
     try {
-      const readDataUrl = (file: File): Promise<string> =>
-        new Promise((resolve, reject) => {
+      const compressFileToWebDataUrl = (file: File): Promise<string> =>
+        new Promise((resolve) => {
+          // Dla animowanych GIF-ów nie przepuszczamy przez canvas, aby nie utracić klatek
+          if (file.type === 'image/gif') {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => resolve('');
+            reader.readAsDataURL(file);
+            return;
+          }
+
           const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
+          reader.onload = (e) => {
+            const rawUrl = e.target?.result as string;
+            if (typeof window === 'undefined') {
+              resolve(rawUrl);
+              return;
+            }
+            const img = new (window as any).Image();
+            img.onload = () => {
+              const MAX_WIDTH = 1200;
+              const MAX_HEIGHT = 500;
+              let width = img.width;
+              let height = img.height;
+              if (width > MAX_WIDTH) {
+                height = Math.round((height * MAX_WIDTH) / width);
+                width = MAX_WIDTH;
+              }
+              if (height > MAX_HEIGHT) {
+                width = Math.round((width * MAX_HEIGHT) / height);
+                height = MAX_HEIGHT;
+              }
+              try {
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                  resolve(rawUrl);
+                  return;
+                }
+                ctx.drawImage(img, 0, 0, width, height);
+                const compressed = canvas.toDataURL('image/jpeg', 0.82);
+                resolve(compressed);
+              } catch {
+                resolve(rawUrl);
+              }
+            };
+            img.onerror = () => resolve(rawUrl);
+            img.src = rawUrl;
+          };
+          reader.onerror = () => resolve('');
           reader.readAsDataURL(file);
         });
 
       const newUris: string[] = [];
       for (const file of fileArray) {
-        const dataUrl = await readDataUrl(file);
+        const compressedDataUrl = await compressFileToWebDataUrl(file);
+        if (!compressedDataUrl) continue;
+
         if (isSupabaseConfigured) {
-          const uploadRes = await uploadPhotoToStorage(dataUrl, 'banners');
+          const uploadRes = await uploadPhotoToStorage(compressedDataUrl, 'banners');
           if (uploadRes.ok) {
             newUris.push(uploadRes.data);
           } else {
-            newUris.push(dataUrl);
+            newUris.push(compressedDataUrl);
           }
         } else {
-          newUris.push(dataUrl);
+          newUris.push(compressedDataUrl);
         }
+      }
+
+      if (newUris.length === 0) {
+        Alert.alert('Błąd', 'Nie udało się przetworzyć wybranych plików graficznych.');
+        return;
       }
 
       const existing = getCustomBannerList(slotId, customBanners);
@@ -106,7 +160,7 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
       onUpdateBannerImage(slotId, combined);
       Alert.alert('Sukces 🖼️', `Dodano ${newUris.length} ${newUris.length === 1 ? 'obraz' : 'obrazy'} do banera.`);
     } catch {
-      Alert.alert('Błąd', 'Nie udało się wczytać przeciągniętych plików.');
+      Alert.alert('Błąd', 'Wystąpił problem podczas wczytywania plików.');
     } finally {
       setUploadingSlot(null);
     }
@@ -383,56 +437,74 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
               )}
             </View>
 
-            {/* STREFA PRZECIĄGNIJ I UPUŚĆ (DRAG & DROP) */}
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragActiveSlot(slot.id);
-              }}
-              onDragLeave={() => setDragActiveSlot(null)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragActiveSlot(null);
-                if (e.dataTransfer && e.dataTransfer.files) {
-                  processUploadedFiles(slot.id, e.dataTransfer.files);
+            {/* STREFA PRZECIĄGNIJ I UPUŚĆ (DRAG & DROP na Webie, Kafel wyboru na urządzeniach mobilnych) */}
+            {Platform.OS === 'web' ? (
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragActiveSlot(slot.id);
+                }}
+                onDragLeave={() => setDragActiveSlot(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragActiveSlot(null);
+                  if (e.dataTransfer && e.dataTransfer.files) {
+                    processUploadedFiles(slot.id, e.dataTransfer.files);
+                  }
+                }}
+                onClick={() => handlePickFromGallery(slot.id, slot.label)}
+                style={
+                  {
+                    border: isDragging ? '2px dashed #059669' : '2px dashed #CBD5E1',
+                    backgroundColor: isDragging ? '#ECFDF5' : '#F8FAFC',
+                    borderRadius: 14,
+                    padding: '16px 12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    margin: '10px 0',
+                    transition: 'all 0.2s ease',
+                  } as any
                 }
-              }}
-              onClick={() => handlePickFromGallery(slot.id, slot.label)}
-              style={
-                {
-                  border: isDragging ? '2px dashed #059669' : '2px dashed #CBD5E1',
-                  backgroundColor: isDragging ? '#ECFDF5' : '#F8FAFC',
-                  borderRadius: 14,
-                  padding: '16px 12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  margin: '10px 0',
-                  transition: 'all 0.2s ease',
-                } as any
-              }
-            >
-              <MaterialCommunityIcons
-                name={isDragging ? 'tray-arrow-down' : 'cloud-upload-outline'}
-                size={28}
-                color={isDragging ? '#059669' : '#64748B'}
-              />
-              <Text
-                style={[
-                  styles.dragDropTitle,
-                  isDragging && { color: '#059669', fontWeight: '700' },
-                ]}
               >
-                {isDragging
-                  ? 'Upuść obrazy tutaj!'
-                  : 'Przeciągnij i upuść pliki banera tutaj (lub kliknij)'}
-              </Text>
-              <Text style={styles.dragDropHint}>
-                Możesz zaznaczyć i upuścić kilka obrazów na raz • PNG, JPG, WEBP, GIF
-              </Text>
-            </div>
+                <MaterialCommunityIcons
+                  name={isDragging ? 'tray-arrow-down' : 'cloud-upload-outline'}
+                  size={28}
+                  color={isDragging ? '#059669' : '#64748B'}
+                />
+                <Text
+                  style={[
+                    styles.dragDropTitle,
+                    isDragging && { color: '#059669', fontWeight: '700' },
+                  ]}
+                >
+                  {isDragging
+                    ? 'Upuść obrazy tutaj!'
+                    : 'Przeciągnij i upuść pliki banera tutaj (lub kliknij)'}
+                </Text>
+                <Text style={styles.dragDropHint}>
+                  Możesz zaznaczyć i upuścić kilka obrazów na raz • PNG, JPG, WEBP, GIF
+                </Text>
+              </div>
+            ) : (
+              <TouchableOpacity
+                style={styles.dragDropNativeBox}
+                onPress={() => handlePickFromGallery(slot.id, slot.label)}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons
+                  name="cloud-upload-outline"
+                  size={28}
+                  color="#059669"
+                />
+                <Text style={styles.dragDropTitle}>Wybierz obrazy z galerii telefonu</Text>
+                <Text style={styles.dragDropHint}>
+                  Dotknij, aby wybrać jeden lub więcej obrazów do rotacji
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {/* LISTA DODANYCH MINIATUREK DLA TEGO SLOTU */}
             {customList.length > 0 && (
@@ -748,6 +820,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     fontFamily: APP_FONT,
+  },
+  dragDropNativeBox: {
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    paddingVertical: 18,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 10,
   },
   dragDropTitle: {
     fontSize: 13,

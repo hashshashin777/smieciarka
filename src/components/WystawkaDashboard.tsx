@@ -119,6 +119,7 @@ export const WystawkaDashboard: React.FC<WystawkaDashboardProps> = ({
   // Rotacja banerów na pulpicie mobilnym (co bannerIntervalSeconds)
   const homeBanners = React.useMemo(() => resolveBannerImages('home', customBanners), [customBanners]);
   const [activeBannerIdx, setActiveBannerIdx] = React.useState(0);
+  const [failedBannerIndices, setFailedBannerIndices] = React.useState<Record<number, boolean>>({});
 
   React.useEffect(() => {
     if (homeBanners.length <= 1) return;
@@ -311,9 +312,19 @@ export const WystawkaDashboard: React.FC<WystawkaDashboardProps> = ({
             }
           >
             <Image
-              source={homeBanners[activeBannerIdx % homeBanners.length] || resolveBannerSource('home', customBanners)}
+              source={
+                failedBannerIndices[activeBannerIdx % homeBanners.length]
+                  ? resolveBannerSource('home')
+                  : (homeBanners[activeBannerIdx % homeBanners.length] || resolveBannerSource('home', customBanners))
+              }
               style={styles.adBannerImage}
               resizeMode="cover"
+              onError={() => {
+                setFailedBannerIndices((prev) => ({
+                  ...prev,
+                  [activeBannerIdx % homeBanners.length]: true,
+                }));
+              }}
             />
             {homeBanners.length > 1 && (
               <View style={styles.bannerDotsContainer}>

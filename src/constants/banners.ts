@@ -24,15 +24,15 @@ export const DEFAULT_WEB_BANNERS: ImageSourcePropType[] = [
 export const BANNER_SLOTS: BannerSlotMeta[] = [
   {
     id: 'home',
-    label: 'Baner na Pulpicie (Aplikacja)',
-    locationHint: 'Pulpit w aplikacji mobilnej (nad wyszukiwarką)',
+    label: 'Baner Główny – Pulpit (Telefon / Aplikacja)',
+    locationHint: 'Główny baner na telefonach i w aplikacji mobilnej (jeśli brak banera WWW, wyświetli się też na komputerze)',
     defaultLabel: 'Domyślny baner aplikacji mobilnej',
     defaultSource: require('../assets/mobile_ad_banner.webp'),
   },
   {
     id: 'web',
-    label: 'Baner na Stronie Głównej (WWW)',
-    locationHint: 'Strona główna WWW na komputerach (rotacja banerów)',
+    label: 'Baner Główny – Strona WWW (Komputery / Panorama)',
+    locationHint: 'Panoramiczny baner na komputerach (jeśli brak banera telefonu, wyświetli się też na telefonie)',
     defaultLabel: 'Rotujące banery strony WWW (6 motywów, 1024×236)',
     defaultSource: require('../assets/web_banner_1.webp'),
   },
@@ -100,9 +100,26 @@ export function resolveBannerImages(
   if (uris.length > 0) {
     return uris.map((uri) => ({ uri }));
   }
+
+  // Inteligentne współdzielenie banera głównego:
+  // Jeśli użytkownik dodał własne banery do slotu 'home' (Pulpit aplikacji/telefon),
+  // a slot 'web' (Strona WWW na komputerze) nie ma własnych banerów – używamy banerów z 'home' na WWW!
   if (slotId === 'web') {
+    const homeUris = getCustomBannerList('home', customBanners);
+    if (homeUris.length > 0) {
+      return homeUris.map((uri) => ({ uri }));
+    }
     return DEFAULT_WEB_BANNERS;
   }
+
+  // I odwrotnie: jeśli slot 'web' ma własne banery, a 'home' nie ma – używamy banerów z 'web' na pulpicie aplikacji!
+  if (slotId === 'home') {
+    const webUris = getCustomBannerList('web', customBanners);
+    if (webUris.length > 0) {
+      return webUris.map((uri) => ({ uri }));
+    }
+  }
+
   return [BANNER_SLOTS_BY_ID[slotId].defaultSource];
 }
 
