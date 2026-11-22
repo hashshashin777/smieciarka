@@ -59,7 +59,8 @@ interface AdminPanelModalProps {
   onUpdateBoardPost: (updatedPost: BoardPost) => void;
   onDeleteBoardPost: (postId: string) => void;
   onToggleBlockAuthor: (authorName: string) => void;
-  onUpdateBannerImage: (slotId: BannerSlotId, uri: string | null) => void;
+  onUpdateBannerImage: (slotId: BannerSlotId, uri: string | string[] | null) => void;
+  onUpdateBannerInterval?: (seconds: number) => void;
   onResetAllBanners: () => void;
   onPublishOfficialNotice: (title: string, content: string) => void;
   onSyncCloud: () => Promise<number>;
@@ -101,6 +102,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   onDeleteBoardPost,
   onToggleBlockAuthor,
   onUpdateBannerImage,
+  onUpdateBannerInterval,
   onResetAllBanners,
   onPublishOfficialNotice,
   onSyncCloud,
@@ -536,8 +538,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               <View>
                 <AdminBannerManager
                   customBanners={adminSettings.customBanners}
+                  bannerIntervalSeconds={adminSettings.bannerIntervalSeconds || 4}
                   adsEnabled={adminSettings.adsEnabled}
                   onUpdateBannerImage={onUpdateBannerImage}
+                  onUpdateBannerInterval={onUpdateBannerInterval}
                   onResetAllBanners={onResetAllBanners}
                 />
 

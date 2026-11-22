@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
@@ -30,10 +31,35 @@ async function hashPinWithSalt(pin: string, salt: string): Promise<string> {
   return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, `${salt}:${pin}`);
 }
 
+async function setSecureItem(key: string, value: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    await AsyncStorage.setItem(key, value);
+    return;
+  }
+  try {
+    await SecureStore.setItemAsync(key, value);
+  } catch {
+    await AsyncStorage.setItem(key, value);
+  }
+}
+
+async function getSecureItem(key: string): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    return AsyncStorage.getItem(key);
+  }
+  try {
+    const val = await SecureStore.getItemAsync(key);
+    if (val !== null && val !== undefined) return val;
+    return AsyncStorage.getItem(key);
+  } catch {
+    return AsyncStorage.getItem(key);
+  }
+}
+
 export const AuthService = {
   async getUserProfile(): Promise<UserProfile | null> {
     try {
-      const raw = await SecureStore.getItemAsync(KEYS.USER_PROFILE);
+      const raw = await getSecureItem(KEYS.USER_PROFILE);
       if (raw) {
         return JSON.parse(raw) as UserProfile;
       }
@@ -66,7 +92,7 @@ export const AuthService = {
 
   async saveUserProfile(profile: UserProfile): Promise<void> {
     try {
-      await SecureStore.setItemAsync(KEYS.USER_PROFILE, JSON.stringify(profile));
+      await setSecureItem(KEYS.USER_PROFILE, JSON.stringify(profile));
     } catch {
       // Ignore secure store errors
     }
@@ -101,7 +127,7 @@ export const AuthService = {
 
   async hasLocalAdminPin(): Promise<boolean> {
     try {
-      const hash = await SecureStore.getItemAsync(KEYS.ADMIN_PIN_HASH);
+      const hash = await getSecureItem(KEYS.ADMIN_PIN_HASH);
       return Boolean(hash);
     } catch {
       return false;
@@ -119,18 +145,18 @@ export const AuthService = {
           ? Crypto.randomUUID()
           : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       const digest = await hashPinWithSalt(trimmed, salt);
-      await SecureStore.setItemAsync(KEYS.ADMIN_PIN_SALT, salt);
-      await SecureStore.setItemAsync(KEYS.ADMIN_PIN_HASH, digest);
+      await setSecureItem(KEYS.ADMIN_PIN_SALT, salt);
+      await setSecureItem(KEYS.ADMIN_PIN_HASH, digest);
       return { ok: true };
     } catch {
-      return { ok: false, error: 'Nie udało się zapisać kodu PIN w bezpiecznej pamięci.' };
+      return { ok: false, error: 'Nie udało się zapisać kodu PIN w pamięci urządzenia.' };
     }
   },
 
   async verifyLocalAdminPin(pin: string): Promise<boolean> {
     try {
-      const salt = await SecureStore.getItemAsync(KEYS.ADMIN_PIN_SALT);
-      const expectedHash = await SecureStore.getItemAsync(KEYS.ADMIN_PIN_HASH);
+      const salt = await getSecureItem(KEYS.ADMIN_PIN_SALT);
+      const expectedHash = await getSecureItem(KEYS.ADMIN_PIN_HASH);
       if (!salt || !expectedHash) return false;
       const digest = await hashPinWithSalt(pin.trim(), salt);
       return digest === expectedHash;

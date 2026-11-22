@@ -1281,9 +1281,16 @@ export default function App() {
     });
   };
 
-  const handleAdminUpdateBannerImage = (slotId: BannerSlotId, uri: string | null) => {
+  const handleAdminUpdateBannerImage = (slotId: BannerSlotId, uri: string | string[] | null) => {
     const nextBanners = { ...adminSettings.customBanners };
-    if (uri && uri.trim().length > 0) {
+    if (Array.isArray(uri)) {
+      const valid = uri.filter((u) => typeof u === 'string' && u.trim().length > 0);
+      if (valid.length > 0) {
+        nextBanners[slotId] = valid;
+      } else {
+        delete nextBanners[slotId];
+      }
+    } else if (uri && uri.trim().length > 0) {
       nextBanners[slotId] = uri.trim();
     } else {
       delete nextBanners[slotId];
@@ -1291,6 +1298,13 @@ export default function App() {
     handleUpdateAdminSettings({
       ...adminSettings,
       customBanners: nextBanners,
+    });
+  };
+
+  const handleAdminUpdateBannerInterval = (seconds: number) => {
+    handleUpdateAdminSettings({
+      ...adminSettings,
+      bannerIntervalSeconds: Math.max(1, Math.min(30, Math.round(seconds))),
     });
   };
 
@@ -1545,6 +1559,7 @@ export default function App() {
             isDark={false}
             adsEnabled={adminSettings.adsEnabled}
             customBanners={adminSettings.customBanners}
+            bannerIntervalSeconds={adminSettings.bannerIntervalSeconds || 4}
           />
         )}
 
@@ -1607,6 +1622,7 @@ export default function App() {
               showAuthControls={adminSettings.accountsEnabled}
               adsEnabled={adminSettings.adsEnabled}
               customBanners={adminSettings.customBanners}
+              bannerIntervalSeconds={adminSettings.bannerIntervalSeconds || 4}
               showOnlineBadge={adminSettings.useRealOnlineUsers !== false}
               onOpenAdmin={() => setIsAdminModalVisible(true)}
               onOpenLogin={adminSettings.accountsEnabled ? () => setIsLoginModalVisible(true) : undefined}
@@ -2094,6 +2110,7 @@ export default function App() {
           onDeleteBoardPost={handleAdminDeleteBoardPost}
           onToggleBlockAuthor={handleAdminToggleBlockAuthor}
           onUpdateBannerImage={handleAdminUpdateBannerImage}
+          onUpdateBannerInterval={handleAdminUpdateBannerInterval}
           onResetAllBanners={handleAdminResetAllBanners}
           onPublishOfficialNotice={handleAdminPublishOfficialNotice}
           onSyncCloud={handleAdminSyncCloud}

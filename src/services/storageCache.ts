@@ -34,6 +34,7 @@ export interface AdminSettings {
   usersCount: number;
   useRealOnlineUsers: boolean;
   customBanners: CustomBannerImages;
+  bannerIntervalSeconds?: number;
   blockedAuthors: string[];
 }
 
@@ -50,6 +51,7 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettings = {
   usersCount: 1,
   useRealOnlineUsers: true,
   customBanners: {},
+  bannerIntervalSeconds: 4,
   blockedAuthors: [],
 };
 
@@ -461,10 +463,13 @@ export const StorageCache = {
         const parsed = JSON.parse(raw);
         const cleanedBanners: CustomBannerImages = {};
         if (parsed.customBanners && typeof parsed.customBanners === 'object') {
-          const slots: BannerSlotId[] = ['home', 'map', 'list', 'board', 'saved'];
+          const slots: BannerSlotId[] = ['home', 'web', 'map', 'list', 'board', 'saved'];
           for (const slot of slots) {
             const val = parsed.customBanners[slot];
-            if (typeof val === 'string' && val.trim().length > 0) {
+            if (Array.isArray(val)) {
+              const filtered = val.filter((u): u is string => typeof u === 'string' && u.trim().length > 0);
+              if (filtered.length > 0) cleanedBanners[slot] = filtered;
+            } else if (typeof val === 'string' && val.trim().length > 0) {
               cleanedBanners[slot] = val.trim();
             }
           }
@@ -514,6 +519,12 @@ export const StorageCache = {
               ? parsed.useRealOnlineUsers
               : DEFAULT_ADMIN_SETTINGS.useRealOnlineUsers,
           customBanners: cleanedBanners,
+          bannerIntervalSeconds:
+            typeof parsed.bannerIntervalSeconds === 'number' &&
+            parsed.bannerIntervalSeconds >= 1 &&
+            parsed.bannerIntervalSeconds <= 30
+              ? Math.round(parsed.bannerIntervalSeconds)
+              : 4,
           blockedAuthors: cleanedBlocked,
         };
       }

@@ -14,7 +14,7 @@ import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PostItem, ItemType, UserProfile } from '../types';
 import { THEME, APP_FONT } from '../constants/categories';
-import { CustomBannerImages, resolveBannerSource } from '../constants/banners';
+import { CustomBannerImages, resolveBannerSource, resolveBannerImages } from '../constants/banners';
 import { CityOption, getCityDisplayLabel } from '../constants/cities';
 import { calculateDistance } from '../utils/helpers';
 import { EcoImpactCard } from './EcoImpactCard';
@@ -68,6 +68,7 @@ interface WystawkaDashboardProps {
   userCoords?: { latitude: number; longitude: number } | null;
   adsEnabled?: boolean;
   customBanners?: CustomBannerImages;
+  bannerIntervalSeconds?: number;
   showOnlineBadge?: boolean;
   onOpenAdmin?: () => void;
 }
@@ -107,12 +108,26 @@ export const WystawkaDashboard: React.FC<WystawkaDashboardProps> = ({
   userCoords = null,
   adsEnabled = true,
   customBanners,
+  bannerIntervalSeconds = 4,
   showOnlineBadge = true,
   onOpenAdmin,
 }) => {
   // Pulpit jest zawsze w jasnym motywie (Light Mode)
   const isDark = false;
   const scrollRef = React.useRef<React.ElementRef<typeof ScrollView>>(null);
+
+  // Rotacja banerów na pulpicie mobilnym (co bannerIntervalSeconds)
+  const homeBanners = React.useMemo(() => resolveBannerImages('home', customBanners), [customBanners]);
+  const [activeBannerIdx, setActiveBannerIdx] = React.useState(0);
+
+  React.useEffect(() => {
+    if (homeBanners.length <= 1) return;
+    const intervalMs = Math.max(1, bannerIntervalSeconds || 4) * 1000;
+    const timer = setInterval(() => {
+      setActiveBannerIdx((prev) => (prev + 1) % homeBanners.length);
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [homeBanners, bannerIntervalSeconds]);
 
   // Samoczynne przewijanie do wskazanego elementu w samouczku
   React.useEffect(() => {
@@ -282,7 +297,7 @@ export const WystawkaDashboard: React.FC<WystawkaDashboardProps> = ({
           </LinearGradient>
         )}
 
-        {/* BANER REKLAMOWY (Własna grafika z zaokrąglonymi brzegami) */}
+        {/* BANER REKLAMOWY (Własna grafika z zaokrąglonymi brzegami i rotacją) */}
         {adsEnabled && (
           <TouchableOpacity
             style={styles.adBannerCard}
@@ -296,10 +311,23 @@ export const WystawkaDashboard: React.FC<WystawkaDashboardProps> = ({
             }
           >
             <Image
-              source={resolveBannerSource('home', customBanners)}
+              source={homeBanners[activeBannerIdx % homeBanners.length] || resolveBannerSource('home', customBanners)}
               style={styles.adBannerImage}
               resizeMode="cover"
             />
+            {homeBanners.length > 1 && (
+              <View style={styles.bannerDotsContainer}>
+                {homeBanners.map((_, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.bannerDot,
+                      idx === (activeBannerIdx % homeBanners.length) && styles.bannerDotActive,
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
           </TouchableOpacity>
         )}
 
@@ -902,6 +930,31 @@ const styles = StyleSheet.create({
   adBannerImage: {
     width: '100%',
     height: '100%',
+  },
+  bannerDotsContainer: {
+    position: 'absolute',
+    bottom: 6,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+  },
+  bannerDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+  },
+  bannerDotActive: {
+    width: 14,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
   },
   // 1. Search bar
   searchBarCard: {

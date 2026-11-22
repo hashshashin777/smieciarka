@@ -2,7 +2,7 @@ import { ImageSourcePropType } from 'react-native';
 
 export type BannerSlotId = 'home' | 'web' | 'map' | 'list' | 'board' | 'saved';
 
-export type CustomBannerImages = Partial<Record<BannerSlotId, string>>;
+export type CustomBannerImages = Partial<Record<BannerSlotId, string | string[]>>;
 
 export interface BannerSlotMeta {
   id: BannerSlotId;
@@ -32,7 +32,7 @@ export const BANNER_SLOTS: BannerSlotMeta[] = [
   {
     id: 'web',
     label: 'Baner na Stronie Głównej (WWW)',
-    locationHint: 'Strona główna WWW na komputerach (rotacja banerów co 4s)',
+    locationHint: 'Strona główna WWW na komputerach (rotacja banerów)',
     defaultLabel: 'Rotujące banery strony WWW (6 motywów, 1024×236)',
     defaultSource: require('../assets/web_banner_1.webp'),
   },
@@ -74,13 +74,42 @@ const BANNER_SLOTS_BY_ID: Record<BannerSlotId, BannerSlotMeta> = BANNER_SLOTS.re
   {} as Record<BannerSlotId, BannerSlotMeta>
 );
 
+export function getCustomBannerList(
+  slotId: BannerSlotId,
+  customBanners?: CustomBannerImages
+): string[] {
+  if (!customBanners) return [];
+  const raw = customBanners[slotId];
+  if (Array.isArray(raw)) {
+    return raw.map((u) => u.trim()).filter((u) => u.length > 0);
+  }
+  if (typeof raw === 'string') {
+    return raw
+      .split(/[\n,]+/)
+      .map((u) => u.trim())
+      .filter((u) => u.length > 0);
+  }
+  return [];
+}
+
+export function resolveBannerImages(
+  slotId: BannerSlotId,
+  customBanners?: CustomBannerImages
+): ImageSourcePropType[] {
+  const uris = getCustomBannerList(slotId, customBanners);
+  if (uris.length > 0) {
+    return uris.map((uri) => ({ uri }));
+  }
+  if (slotId === 'web') {
+    return DEFAULT_WEB_BANNERS;
+  }
+  return [BANNER_SLOTS_BY_ID[slotId].defaultSource];
+}
+
 export function resolveBannerSource(
   slotId: BannerSlotId,
   customBanners?: CustomBannerImages
 ): ImageSourcePropType {
-  const customUri = customBanners?.[slotId]?.trim();
-  if (customUri) {
-    return { uri: customUri };
-  }
-  return BANNER_SLOTS_BY_ID[slotId].defaultSource;
+  const images = resolveBannerImages(slotId, customBanners);
+  return images[0] || BANNER_SLOTS_BY_ID[slotId].defaultSource;
 }

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PostItem, ItemType, BoardPost, UserProfile } from '../types';
-import { CATEGORIES, THEME } from '../constants/categories';
+import { CATEGORIES } from '../constants/categories';
 import { CityOption, getCityDisplayLabel } from '../constants/cities';
 import { calculateDistance, formatRelativeTime, safeOpenUrl } from '../utils/helpers';
 import { EcoStats, AdminSettings } from '../services/storageCache';

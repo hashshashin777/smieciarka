@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Image, ScrollView, Linking } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { THEME, APP_FONT } from '../constants/categories';
-import { CustomBannerImages, resolveBannerSource } from '../constants/banners';
+import { CustomBannerImages, resolveBannerSource, resolveBannerImages } from '../constants/banners';
 import { ItemType } from '../types';
 import { safeOpenUrl } from '../utils/helpers';
 
@@ -19,6 +19,7 @@ interface HeaderProps {
   isDark?: boolean;
   adsEnabled?: boolean;
   customBanners?: CustomBannerImages;
+  bannerIntervalSeconds?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -34,7 +35,28 @@ export const Header: React.FC<HeaderProps> = ({
   isDark = false,
   adsEnabled = true,
   customBanners,
+  bannerIntervalSeconds = 4,
 }) => {
+  const currentSlotId = viewMode === 'home' ? null : viewMode;
+  const currentSlotBanners = React.useMemo(() => {
+    if (!currentSlotId) return [];
+    return resolveBannerImages(currentSlotId, customBanners);
+  }, [currentSlotId, customBanners]);
+
+  const [activeSlideIdx, setActiveSlideIdx] = React.useState(0);
+
+
+  React.useEffect(() => {
+    if (currentSlotBanners.length <= 1) return;
+    const intervalMs = Math.max(1, bannerIntervalSeconds || 4) * 1000;
+    const timer = setInterval(() => {
+      setActiveSlideIdx((prev) => (prev + 1) % currentSlotBanners.length);
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [currentSlotBanners, bannerIntervalSeconds]);
+
+  const currentBannerSource = currentSlotBanners[activeSlideIdx % currentSlotBanners.length] ||
+    (currentSlotId ? resolveBannerSource(currentSlotId, customBanners) : undefined);
   return (
     <View style={[styles.container, isDark && styles.containerDark]}>
       {/* 1. Reklamy na samej górze (nad search barem) w zakładkach Mapa, Lista, Tablica i Zapisane */}
@@ -50,11 +72,26 @@ export const Header: React.FC<HeaderProps> = ({
             )
           }
         >
-          <Image
-            source={resolveBannerSource('map', customBanners)}
-            style={styles.adBannerImage}
-            resizeMode="cover"
-          />
+          {currentBannerSource && (
+            <Image
+              source={currentBannerSource}
+              style={styles.adBannerImage}
+              resizeMode="cover"
+            />
+          )}
+          {currentSlotBanners.length > 1 && (
+            <View style={styles.bannerDotsContainer}>
+              {currentSlotBanners.map((_, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.bannerDot,
+                    idx === (activeSlideIdx % currentSlotBanners.length) && styles.bannerDotActive,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
         </TouchableOpacity>
       )}
 
@@ -73,11 +110,26 @@ export const Header: React.FC<HeaderProps> = ({
             );
           }}
         >
-          <Image
-            source={resolveBannerSource('list', customBanners)}
-            style={styles.adBannerImage}
-            resizeMode="cover"
-          />
+          {currentBannerSource && (
+            <Image
+              source={currentBannerSource}
+              style={styles.adBannerImage}
+              resizeMode="cover"
+            />
+          )}
+          {currentSlotBanners.length > 1 && (
+            <View style={styles.bannerDotsContainer}>
+              {currentSlotBanners.map((_, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.bannerDot,
+                    idx === (activeSlideIdx % currentSlotBanners.length) && styles.bannerDotActive,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
         </TouchableOpacity>
       )}
 
@@ -96,11 +148,26 @@ export const Header: React.FC<HeaderProps> = ({
             );
           }}
         >
-          <Image
-            source={resolveBannerSource('board', customBanners)}
-            style={styles.adBannerImage}
-            resizeMode="cover"
-          />
+          {currentBannerSource && (
+            <Image
+              source={currentBannerSource}
+              style={styles.adBannerImage}
+              resizeMode="cover"
+            />
+          )}
+          {currentSlotBanners.length > 1 && (
+            <View style={styles.bannerDotsContainer}>
+              {currentSlotBanners.map((_, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.bannerDot,
+                    idx === (activeSlideIdx % currentSlotBanners.length) && styles.bannerDotActive,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
         </TouchableOpacity>
       )}
 
@@ -126,11 +193,26 @@ export const Header: React.FC<HeaderProps> = ({
             );
           }}
         >
-          <Image
-            source={resolveBannerSource('saved', customBanners)}
-            style={styles.adBannerImage}
-            resizeMode="cover"
-          />
+          {currentBannerSource && (
+            <Image
+              source={currentBannerSource}
+              style={styles.adBannerImage}
+              resizeMode="cover"
+            />
+          )}
+          {currentSlotBanners.length > 1 && (
+            <View style={styles.bannerDotsContainer}>
+              {currentSlotBanners.map((_, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.bannerDot,
+                    idx === (activeSlideIdx % currentSlotBanners.length) && styles.bannerDotActive,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
         </TouchableOpacity>
       )}
 
@@ -329,6 +411,31 @@ const styles = StyleSheet.create({
   adBannerImage: {
     width: '100%',
     height: '100%',
+  },
+  bannerDotsContainer: {
+    position: 'absolute',
+    bottom: 5,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+  },
+  bannerDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+  },
+  bannerDotActive: {
+    width: 14,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
   },
   searchRow: {
     flexDirection: 'row',

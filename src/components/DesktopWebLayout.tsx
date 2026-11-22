@@ -30,7 +30,7 @@ import {
   getNeighborhoodSubtitle,
   isDistanceInNeighborhood,
 } from '../services/storageCache';
-import { resolveBannerSource, DEFAULT_WEB_BANNERS } from '../constants/banners';
+import { resolveBannerImages } from '../constants/banners';
 import { fetchAirQuality, AirQualityData } from '../services/airQuality';
 import { WebLeafletMap } from './WebLeafletMap';
 
@@ -149,18 +149,23 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
     }
   }, [loadAirQuality, showAirQuality]);
 
-  // Rotacja banerów na stronie głównej co 4 sekundy
+  // Rotacja banerów na stronie głównej (custom lub domyślne, czas wg adminSettings.bannerIntervalSeconds)
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const webBanners = useMemo(
+    () => resolveBannerImages('web', adminSettings?.customBanners),
+    [adminSettings?.customBanners]
+  );
 
   useEffect(() => {
-    if (adminSettings?.customBanners?.web?.trim()) return;
+    if (webBanners.length <= 1) return;
 
+    const intervalMs = Math.max(1, adminSettings?.bannerIntervalSeconds || 4) * 1000;
     const bannerTimer = setInterval(() => {
-      setCurrentBannerIndex((prev) => (prev + 1) % DEFAULT_WEB_BANNERS.length);
-    }, 4000);
+      setCurrentBannerIndex((prev) => (prev + 1) % webBanners.length);
+    }, intervalMs);
 
     return () => clearInterval(bannerTimer);
-  }, [adminSettings?.customBanners?.web]);
+  }, [webBanners, adminSettings?.bannerIntervalSeconds]);
 
   const handleSearchSubmit = () => {
     onSearchChange(localSearch);
@@ -568,49 +573,41 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
       <section style={{ width: '100%' } as any}>
         <View style={styles.heroSearchSection}>
           <View style={styles.heroSearchInner}>
-            {/* Panoramiczny Baner WWW (rotacja 6 motywów co 4s, zoptymalizowany WebP, niezależny slot admina 'web') */}
+            {/* Panoramiczny Baner WWW (rotacja motywów z czasem z adminSettings, zoptymalizowany WebP, slot admina 'web') */}
             {adminSettings?.adsEnabled !== false && (
               <View style={styles.bannerWrapper}>
-                {adminSettings?.customBanners?.web?.trim() ? (
+                {webBanners.map((bannerSrc, idx) => (
                   <Image
-                    source={resolveBannerSource('web', adminSettings?.customBanners)}
-                    style={styles.heroBannerImage}
+                    key={idx}
+                    source={bannerSrc}
+                    style={[
+                      styles.heroBannerImage,
+                      styles.carouselBannerImage,
+                      {
+                        opacity: currentBannerIndex === idx ? 1 : 0,
+                        pointerEvents: currentBannerIndex === idx ? 'auto' : 'none',
+                      },
+                    ]}
                     resizeMode="contain"
                   />
-                ) : (
-                  <>
-                    {DEFAULT_WEB_BANNERS.map((bannerSrc, idx) => (
-                      <Image
+                ))}
+
+                {/* Wskaźniki rotacji slajdów (kropki z możliwością kliknięcia) */}
+                {webBanners.length > 1 && (
+                  <View style={styles.bannerDotsContainer}>
+                    {webBanners.map((_, idx) => (
+                      <TouchableOpacity
                         key={idx}
-                        source={bannerSrc}
+                        onPress={() => setCurrentBannerIndex(idx)}
                         style={[
-                          styles.heroBannerImage,
-                          styles.carouselBannerImage,
-                          {
-                            opacity: currentBannerIndex === idx ? 1 : 0,
-                            pointerEvents: currentBannerIndex === idx ? 'auto' : 'none',
-                          },
+                          styles.bannerDot,
+                          currentBannerIndex === idx && styles.bannerDotActive,
                         ]}
-                        resizeMode="contain"
+                        activeOpacity={0.8}
+                        accessibilityLabel={`Baner ${idx + 1}`}
                       />
                     ))}
-
-                    {/* Wskaźniki rotacji slajdów (kropki z możliwością kliknięcia) */}
-                    <View style={styles.bannerDotsContainer}>
-                      {DEFAULT_WEB_BANNERS.map((_, idx) => (
-                        <TouchableOpacity
-                          key={idx}
-                          onPress={() => setCurrentBannerIndex(idx)}
-                          style={[
-                            styles.bannerDot,
-                            currentBannerIndex === idx && styles.bannerDotActive,
-                          ]}
-                          activeOpacity={0.8}
-                          accessibilityLabel={`Baner ${idx + 1}`}
-                        />
-                      ))}
-                    </View>
-                  </>
+                  </View>
                 )}
               </View>
             )}
