@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   TextInput,
   Image,
   ScrollView,
@@ -329,7 +330,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                   size={20}
                   color={
                     activeTab === 'all' || activeTab === 'wystawka' || activeTab === 'oddam'
-                      ? '#34D399'
+                      ? '#102B25'
                       : '#FFFFFF'
                   }
                 />
@@ -355,7 +356,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 <MaterialCommunityIcons
                   name="map-outline"
                   size={20}
-                  color={activeTab === 'map' ? '#34D399' : '#FFFFFF'}
+                  color={activeTab === 'map' ? '#102B25' : '#FFFFFF'}
                 />
                 <Text
                   style={[
@@ -378,7 +379,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 <MaterialCommunityIcons
                   name="forum-outline"
                   size={20}
-                  color={activeTab === 'board' ? '#34D399' : '#FFFFFF'}
+                  color={activeTab === 'board' ? '#102B25' : '#FFFFFF'}
                 />
                 <Text
                   style={[
@@ -405,7 +406,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                     savedItemIds.length > 0
                       ? '#EF4444'
                       : activeTab === 'saved'
-                      ? '#34D399'
+                      ? '#102B25'
                       : '#FFFFFF'
                   }
                 />
@@ -450,16 +451,18 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
               )}
 
               {/* Przycisk akcji CTA "Dodaj ogłoszenie" */}
-              <TouchableOpacity
-                style={styles.addCtaButton}
+              <Pressable
+                style={(state: any) => [
+                  styles.addCtaButton,
+                  (state.hovered || state.pressed) && styles.addCtaButtonHovered,
+                ]}
                 onPress={onOpenAddModal}
-                activeOpacity={0.85}
                 accessibilityRole="button"
                 accessibilityLabel="Dodaj nowe ogłoszenie"
               >
-                <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />
+                <MaterialCommunityIcons name="plus" size={20} color="#102B25" />
                 <Text style={styles.addCtaButtonText}>Dodaj ogłoszenie</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -950,7 +953,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 <MaterialCommunityIcons
                   name="map-outline"
                   size={18}
-                  color={activeTab === 'map' ? '#059669' : '#64748B'}
+                  color={activeTab === 'map' ? '#102B25' : '#64748B'}
                 />
                 <Text
                   style={[
@@ -973,7 +976,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 <MaterialCommunityIcons
                   name="format-list-bulleted"
                   size={18}
-                  color={activeTab === 'all' ? '#059669' : '#64748B'}
+                  color={activeTab === 'all' ? '#102B25' : '#64748B'}
                 />
                 <Text
                   style={[
@@ -1049,7 +1052,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 <MaterialCommunityIcons
                   name="bulletin-board"
                   size={18}
-                  color={activeTab === 'board' ? '#059669' : '#64748B'}
+                  color={activeTab === 'board' ? '#102B25' : '#64748B'}
                 />
                 <Text
                   style={[
@@ -1760,17 +1763,16 @@ const styles = StyleSheet.create({
     cursor: 'pointer' as any,
   },
   navLinkActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.22)',
-    borderColor: 'rgba(52, 211, 153, 0.45)',
-    backdropFilter: 'blur(8px)',
-  } as any,
+    backgroundColor: '#F2FCE0',
+    borderColor: '#BEF264',
+  },
   navLinkText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
   navLinkTextActive: {
-    color: '#34D399',
+    color: '#102B25',
     fontWeight: '700',
   },
   adminPill: {
@@ -1779,23 +1781,27 @@ const styles = StyleSheet.create({
     borderColor: '#FBBF24',
   },
   addCtaButton: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#BEF264',
     borderWidth: 1,
-    borderColor: '#34D399',
+    borderColor: '#ADDE5E',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    shadowColor: '#10B981',
+    shadowColor: '#ADDE5E',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
     cursor: 'pointer' as any,
   },
+  addCtaButtonHovered: {
+    backgroundColor: '#ADDE5E',
+    borderColor: '#9ECC50',
+  },
   addCtaButtonText: {
-    color: '#FFFFFF',
+    color: '#102B25',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -2554,7 +2560,7 @@ const styles = StyleSheet.create({
     cursor: 'pointer' as any,
   },
   desktopTabItemActive: {
-    borderBottomColor: '#059669',
+    borderBottomColor: '#BEF264',
   },
   desktopTabText: {
     fontSize: 15,
@@ -2562,7 +2568,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   desktopTabTextActive: {
-    color: '#002F34',
+    color: '#102B25',
     fontWeight: '700',
   },
   tabCountPill: {
@@ -2572,7 +2578,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   tabCountPillActive: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: '#F2FCE0',
   },
   tabCountText: {
     fontSize: 12,
@@ -2580,7 +2586,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   tabCountTextActive: {
-    color: '#047857',
+    color: '#102B25',
   },
   tabBadgeDot: {
     width: 8,
