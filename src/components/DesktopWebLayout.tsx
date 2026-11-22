@@ -324,7 +324,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                   size={20}
                   color={
                     activeTab === 'all' || activeTab === 'wystawka' || activeTab === 'oddam'
-                      ? '#FEF3C7'
+                      ? '#34D399'
                       : '#FFFFFF'
                   }
                 />
@@ -350,7 +350,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 <MaterialCommunityIcons
                   name="map-outline"
                   size={20}
-                  color={activeTab === 'map' ? '#FEF3C7' : '#FFFFFF'}
+                  color={activeTab === 'map' ? '#34D399' : '#FFFFFF'}
                 />
                 <Text
                   style={[
@@ -373,7 +373,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 <MaterialCommunityIcons
                   name="forum-outline"
                   size={20}
-                  color={activeTab === 'board' ? '#FEF3C7' : '#FFFFFF'}
+                  color={activeTab === 'board' ? '#34D399' : '#FFFFFF'}
                 />
                 <Text
                   style={[
@@ -400,7 +400,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                     savedItemIds.length > 0
                       ? '#EF4444'
                       : activeTab === 'saved'
-                      ? '#FEF3C7'
+                      ? '#34D399'
                       : '#FFFFFF'
                   }
                 />
@@ -452,7 +452,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 accessibilityRole="button"
                 accessibilityLabel="Dodaj nowe ogłoszenie"
               >
-                <MaterialCommunityIcons name="plus" size={20} color="#064E3B" />
+                <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />
                 <Text style={styles.addCtaButtonText}>Dodaj ogłoszenie</Text>
               </TouchableOpacity>
             </View>
@@ -1763,8 +1763,8 @@ const styles = StyleSheet.create({
     cursor: 'pointer' as any,
   },
   navLinkActive: {
-    backgroundColor: 'rgba(254, 243, 199, 0.22)',
-    borderColor: 'rgba(254, 243, 199, 0.50)',
+    backgroundColor: 'rgba(16, 185, 129, 0.22)',
+    borderColor: 'rgba(52, 211, 153, 0.45)',
     backdropFilter: 'blur(8px)',
   } as any,
   navLinkText: {
@@ -1773,7 +1773,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   navLinkTextActive: {
-    color: '#FEF3C7',
+    color: '#34D399',
     fontWeight: '700',
   },
   adminPill: {
@@ -1782,23 +1782,23 @@ const styles = StyleSheet.create({
     borderColor: '#FBBF24',
   },
   addCtaButton: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#10B981',
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: '#34D399',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 5,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
     cursor: 'pointer' as any,
   },
   addCtaButtonText: {
-    color: '#064E3B',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },
