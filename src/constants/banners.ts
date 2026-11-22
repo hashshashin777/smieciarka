@@ -12,6 +12,15 @@ export interface BannerSlotMeta {
   defaultSource: ImageSourcePropType;
 }
 
+export const DEFAULT_WEB_BANNERS: ImageSourcePropType[] = [
+  require('../assets/web_banner_1.webp'),
+  require('../assets/web_banner_2.webp'),
+  require('../assets/web_banner_3.webp'),
+  require('../assets/web_banner_4.webp'),
+  require('../assets/web_banner_5.webp'),
+  require('../assets/web_banner_6.webp'),
+];
+
 export const BANNER_SLOTS: BannerSlotMeta[] = [
   {
     id: 'home',
@@ -23,9 +32,9 @@ export const BANNER_SLOTS: BannerSlotMeta[] = [
   {
     id: 'web',
     label: 'Baner na Stronie Głównej (WWW)',
-    locationHint: 'Strona główna WWW na komputerach (nad wyszukiwarką)',
-    defaultLabel: 'Domyślny baner strony WWW (1024×200)',
-    defaultSource: require('../assets/web_ad_banner.webp'),
+    locationHint: 'Strona główna WWW na komputerach (rotacja banerów co 4s)',
+    defaultLabel: 'Rotujące banery strony WWW (6 motywów, 1024×236)',
+    defaultSource: require('../assets/web_banner_1.webp'),
   },
   {
     id: 'map',

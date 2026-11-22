@@ -54,6 +54,7 @@ export const AirQualityCard: React.FC<AirQualityCardProps> = ({
   }, [lat, lon, placeName]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAirQuality();
   }, [loadAirQuality]);
 

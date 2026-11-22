@@ -12,43 +12,28 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Slider from '@react-native-community/slider';
 import { PostItem, ItemType, BoardPost, UserProfile } from '../types';
-import { CATEGORIES, THEME } from '../constants/categories';
+import { CATEGORIES } from '../constants/categories';
 import { CityOption, getCityDisplayLabel } from '../constants/cities';
 import { calculateDistance, formatRelativeTime, safeOpenUrl } from '../utils/helpers';
-import { EcoStats, AdminSettings } from '../services/storageCache';
-import { resolveBannerSource } from '../constants/banners';
+import {
+  EcoStats,
+  AdminSettings,
+  NeighborhoodSettings,
+  NeighborhoodScope,
+  MAX_NEIGHBORHOOD_RADIUS_KM,
+  NEIGHBORHOOD_SCOPE_OPTIONS,
+  clampNeighborhoodRadius,
+  getNeighborhoodScope,
+  getNeighborhoodDisplayValue,
+  getNeighborhoodSubtitle,
+  isDistanceInNeighborhood,
+} from '../services/storageCache';
+import { resolveBannerSource, DEFAULT_WEB_BANNERS } from '../constants/banners';
 import { fetchAirQuality, AirQualityData } from '../services/airQuality';
 
-const WEEKDAYS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
-const MONTHS_SHORT_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
 
-function getCalendarWeekDays(streakDays: number = 3) {
-  const now = new Date();
-  const todayIndex = (now.getDay() + 6) % 7; // 0 = Pn .. 6 = Nd
-  const monday = new Date(now);
-  monday.setHours(0, 0, 0, 0);
-  monday.setDate(now.getDate() - todayIndex);
-
-  const days = WEEKDAYS.map((label, idx) => {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + idx);
-    const isToday = idx === todayIndex;
-    const isCompleted = idx <= todayIndex && todayIndex - idx < Math.max(streakDays, 1);
-    const isFuture = idx > todayIndex;
-
-    return {
-      label,
-      dayNumber: date.getDate(),
-      isToday,
-      isCompleted,
-      isFuture,
-    };
-  });
-
-  const todayFormatted = `${WEEKDAYS[todayIndex]}, ${now.getDate()} ${MONTHS_SHORT_PL[now.getMonth()]}`;
-  return { days, todayFormatted };
-}
 
 interface DesktopWebLayoutProps {
   items: PostItem[];
@@ -79,6 +64,11 @@ interface DesktopWebLayoutProps {
   userCoords?: { latitude: number; longitude: number } | null;
   adminSettings: AdminSettings;
   streakDays?: number;
+  neighborhoodSettings?: NeighborhoodSettings;
+  onOpenNeighborhoodModal?: () => void;
+  onChangeRadius?: (val: number) => void;
+  onSelectNeighborhoodScope?: (scope: NeighborhoodScope) => void;
+  onToggleAlerts?: () => void;
 }
 
 type DesktopTab = 'all' | 'wystawka' | 'oddam' | 'board' | 'map' | 'saved';
@@ -112,15 +102,21 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
   userCoords,
   adminSettings,
   streakDays = 3,
+  neighborhoodSettings = {
+    radiusKm: 2,
+    scope: 'radius',
+    alertsEnabled: true,
+    label: 'Mój rewir (2 km)',
+  },
+  onOpenNeighborhoodModal,
+  onChangeRadius,
+  onSelectNeighborhoodScope,
+  onToggleAlerts,
 }) => {
   // Strona główna domyślnie otwiera się z widokiem mapy zgodnie z ustaleniami
   const [activeTab, setActiveTab] = useState<DesktopTab>('map');
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
-  const { days: calendarDays, todayFormatted } = useMemo(
-    () => getCalendarWeekDays(streakDays),
-    [streakDays]
-  );
 
   const [airData, setAirData] = useState<AirQualityData | null>(null);
   const [airLoading, setAirLoading] = useState<boolean>(false);
@@ -143,12 +139,27 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
     }
   }, [airLat, airLon, cityLabel]);
 
-  useEffect(() => {
-    loadAirQuality();
-  }, [loadAirQuality]);
+  // Widoczność modułu czystego powietrza na stronie WWW (ukryty na życzenie)
+  const showAirQuality = false;
 
-  // Widoczność modułów serii i czystego powietrza pod górną nawigacją (domyślnie ukryte)
-  const showTopStatusWidgets = false;
+  useEffect(() => {
+    if (showAirQuality) {
+      loadAirQuality();
+    }
+  }, [loadAirQuality, showAirQuality]);
+
+  // Rotacja banerów na stronie głównej co 4 sekundy
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+
+  useEffect(() => {
+    if (adminSettings?.customBanners?.web?.trim()) return;
+
+    const bannerTimer = setInterval(() => {
+      setCurrentBannerIndex((prev) => (prev + 1) % DEFAULT_WEB_BANNERS.length);
+    }, 4000);
+
+    return () => clearInterval(bannerTimer);
+  }, [adminSettings?.customBanners?.web]);
 
   const handleSearchSubmit = () => {
     onSearchChange(localSearch);
@@ -165,6 +176,20 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
       onSelectFilterType('all');
     }
   };
+
+  // Liczba ofert w wybranym rewirze
+  const itemsInRewirCount = useMemo(() => {
+    if (!userCoords) return items.length;
+    return items.filter((i) => {
+      const dist = calculateDistance(
+        userCoords.latitude,
+        userCoords.longitude,
+        i.location.latitude,
+        i.location.longitude
+      ).value;
+      return isDistanceInNeighborhood(dist, neighborhoodSettings);
+    }).length;
+  }, [items, userCoords, neighborhoodSettings]);
 
   // Filtered items based on tab, category, search
   const displayedItems = useMemo(() => {
@@ -192,8 +217,40 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
       );
     }
 
+    // Zawężenie do zasięgu rewiru, jeśli dostępne są współrzędne użytkownika i nie wybrano całej Polski
+    if (userCoords && getNeighborhoodScope(neighborhoodSettings) !== 'country') {
+      result = result.filter((i) => {
+        const dist = calculateDistance(
+          userCoords.latitude,
+          userCoords.longitude,
+          i.location.latitude,
+          i.location.longitude
+        ).value;
+        return isDistanceInNeighborhood(dist, neighborhoodSettings);
+      });
+    }
+
+    // Sortowanie według odległości od użytkownika, jeśli dostępne są współrzędne
+    if (userCoords) {
+      result.sort((a, b) => {
+        const distA = calculateDistance(
+          userCoords.latitude,
+          userCoords.longitude,
+          a.location.latitude,
+          a.location.longitude
+        ).value;
+        const distB = calculateDistance(
+          userCoords.latitude,
+          userCoords.longitude,
+          b.location.latitude,
+          b.location.longitude
+        ).value;
+        return distA - distB;
+      });
+    }
+
     return result;
-  }, [items, activeTab, filterCategory, searchQuery, savedItemIds]);
+  }, [items, activeTab, filterCategory, searchQuery, savedItemIds, userCoords, neighborhoodSettings]);
 
   // Filtered board posts for board or saved tabs
   const displayedBoardPosts = useMemo(() => {
@@ -402,174 +459,159 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
           </View>
         </View>
 
-        {/* MODUŁY WIDGETÓW GÓRNYCH (UKRYTE NA ŻYCZENIE) */}
-        {showTopStatusWidgets && (
-          <View style={styles.topWidgetsSection}>
-            <View style={styles.topWidgetsInner}>
-              {/* 1. KARTA: MODUŁ SERII ZERO-WASTE */}
-              <LinearGradient
-                colors={['#064E3B', '#022C22']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.widgetCard}
-              >
-                <View style={styles.widgetHeaderRow}>
-                  <View style={styles.flameIconBox}>
-                    <MaterialCommunityIcons name="fire" size={24} color="#FBBF24" />
+        {/* MODUŁ CZYSTE POWIETRZE POD PASKIEM NAWIGACYJNYM (UKRYTY NA ŻYCZENIE) */}
+        {showAirQuality && (
+          <View style={styles.airBarSection}>
+            <View style={styles.airBarInner}>
+              {/* Lewa strona: Ikona, Tytuł i Wybór miasta */}
+              <View style={styles.airBarLeft}>
+                <View style={styles.airBarIconBox}>
+                  <MaterialCommunityIcons name="weather-windy" size={18} color="#23E5DB" />
+                </View>
+                <View style={styles.airBarTextGroup}>
+                  <View style={styles.airBarTitleRow}>
+                    <Text style={styles.airBarTitle}>Jakość powietrza:</Text>
+                    <TouchableOpacity
+                      onPress={onOpenCityPicker}
+                      style={styles.airBarCityBtn}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Zmień miasto dla jakości powietrza, aktualnie: ${cityLabel}`}
+                    >
+                      <Text style={styles.airBarCityText}>{cityLabel}</Text>
+                      <MaterialCommunityIcons name="chevron-down" size={14} color="#23E5DB" />
+                    </TouchableOpacity>
+                    <View style={styles.airBarLiveBadge}>
+                      <View style={styles.airBarLiveDot} />
+                      <Text style={styles.airBarLiveText}>GPS NA ŻYWO</Text>
+                    </View>
                   </View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={styles.widgetTitle}>
-                      Seria: <Text style={styles.widgetHighlight}>{streakDays} {streakDays === 1 ? 'dzień' : 'dni'} z rzędu</Text>
-                    </Text>
-                    <Text style={styles.widgetSub}>
-                      {streakDays >= 5 ? 'Świetna regularność Zero-Waste!' : 'Odwiedzaj nas codziennie, by ratować przedmioty'}
-                    </Text>
-                  </View>
-                  <View style={styles.calendarDateBadge}>
-                    <MaterialCommunityIcons name="calendar-today" size={12} color="#FDE68A" style={{ marginRight: 4 }} />
-                    <Text style={styles.calendarDateText}>{todayFormatted}</Text>
-                  </View>
+                  <Text style={styles.airBarSub} numberOfLines={1}>
+                    {airData?.aqiDescription || 'Monitorowanie jakości powietrza w Twojej okolicy'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Prawa strona: AQI, parametry PM2.5, PM10, NO2 i odświeżanie */}
+              <View style={styles.airBarRight}>
+                {/* Odznaka AQI */}
+                <View
+                  style={[
+                    styles.airBarAqiBadge,
+                    {
+                      backgroundColor: airData ? `${airData.aqiColor}22` : 'rgba(52, 211, 153, 0.16)',
+                      borderColor: airData ? `${airData.aqiColor}55` : 'rgba(52, 211, 153, 0.35)',
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.airBarStatusDot,
+                      { backgroundColor: airData?.aqiColor || '#34D399' },
+                    ]}
+                  />
+                  <Text style={[styles.airBarAqiText, { color: airData?.aqiColor || '#34D399' }]}>
+                    AQI {airData?.aqi ?? 30} • {airData?.aqiLabel || 'Dobra'}
+                  </Text>
                 </View>
 
-                {/* Tydzień kalendarzowy Pn - Nd */}
-                <View style={styles.weekCalendarRow}>
-                  {calendarDays.map((day) => (
-                    <View key={day.label} style={styles.calendarDayCol}>
-                      <Text
-                        style={[
-                          styles.calendarWeekdayLabel,
-                          day.isToday && styles.calendarWeekdayLabelToday,
-                          day.isFuture && styles.calendarWeekdayLabelFuture,
-                        ]}
-                      >
-                        {day.label}
-                      </Text>
-                      <View
-                        style={[
-                          styles.calendarCircle,
-                          day.isCompleted && !day.isToday && styles.calendarCircleDone,
-                          day.isToday && styles.calendarCircleToday,
-                          day.isFuture && styles.calendarCircleFuture,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.calendarDayNumber,
-                            day.isCompleted && !day.isToday && styles.calendarDayNumberDone,
-                            day.isToday && styles.calendarDayNumberToday,
-                            day.isFuture && styles.calendarDayNumberFuture,
-                          ]}
-                        >
-                          {day.dayNumber}
+                {/* Parametry cząstek PM2.5, PM10, NO2 */}
+                <View style={styles.airBarMetricsGroup}>
+                  <View style={styles.airBarMetricItem}>
+                    <Text style={styles.airBarMetricKey}>PM2.5</Text>
+                    <Text style={styles.airBarMetricVal}>
+                      {airData?.pm25 ?? 9.9} <Text style={styles.airBarMetricUnit}>µg/m³</Text>
+                    </Text>
+                  </View>
+                  <View style={styles.airBarMetricDivider} />
+                  <View style={styles.airBarMetricItem}>
+                    <Text style={styles.airBarMetricKey}>PM10</Text>
+                    <Text style={styles.airBarMetricVal}>
+                      {airData?.pm10 ?? 11} <Text style={styles.airBarMetricUnit}>µg/m³</Text>
+                    </Text>
+                  </View>
+                  {airData?.no2 !== undefined && (
+                    <>
+                      <View style={styles.airBarMetricDivider} />
+                      <View style={styles.airBarMetricItem}>
+                        <Text style={styles.airBarMetricKey}>NO₂</Text>
+                        <Text style={styles.airBarMetricVal}>
+                          {airData.no2} <Text style={styles.airBarMetricUnit}>µg/m³</Text>
                         </Text>
-                        {day.isCompleted && !day.isToday && (
-                          <View style={styles.calendarDoneDot}>
-                            <MaterialCommunityIcons name="check" size={9} color="#064E3B" />
-                          </View>
-                        )}
                       </View>
-                      {day.isToday ? (
-                        <View style={styles.todayPill}>
-                          <Text style={styles.todayPillText}>DZIŚ</Text>
-                        </View>
-                      ) : (
-                        <View style={styles.todayPillSpacer} />
-                      )}
-                    </View>
-                  ))}
-                </View>
-              </LinearGradient>
-
-              {/* 2. KARTA: MODUŁ CZYSTEGO POWIETRZA */}
-              <LinearGradient
-                colors={['#00383F', '#002227']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.widgetCard}
-              >
-                <View style={styles.widgetHeaderRow}>
-                  <View style={[styles.flameIconBox, { backgroundColor: 'rgba(35, 229, 219, 0.15)', borderColor: 'rgba(35, 229, 219, 0.3)' }]}>
-                    <MaterialCommunityIcons name="weather-windy" size={24} color="#23E5DB" />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={styles.widgetTitle}>Czyste powietrze</Text>
-                      <View style={styles.liveGpsPill}>
-                        <View style={styles.liveGpsDot} />
-                        <Text style={styles.liveGpsText}>GPS NA ŻYWO</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.widgetSub} numberOfLines={1}>
-                      {cityLabel} • {airData?.aqiDescription || 'Monitorowanie jakości powietrza'}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={loadAirQuality}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    style={styles.airRefreshBtn}
-                    activeOpacity={0.8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Odśwież jakość powietrza"
-                  >
-                    {airLoading ? (
-                      <ActivityIndicator size="small" color="#23E5DB" />
-                    ) : (
-                      <MaterialCommunityIcons name="refresh" size={18} color="#23E5DB" />
-                    )}
-                  </TouchableOpacity>
+                    </>
+                  )}
                 </View>
 
-                {/* Parametry czystości powietrza */}
-                <View style={styles.airMetricsRow}>
-                  {/* Wskaźnik AQI */}
-                  <View style={styles.airAqiBadgeBox}>
-                    <Text style={styles.airAqiVal}>{airData?.aqi ?? 30}</Text>
-                    <View style={{ marginLeft: 8 }}>
-                      <Text style={styles.airAqiLabel}>INDEKS AQI</Text>
-                      <Text style={[styles.airAqiStatusText, { color: airData?.aqiColor || '#34D399' }]}>
-                        {airData?.aqiLabel || 'Dobra'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Rozbicie na cząstki pyłu PM2.5, PM10, NO2 */}
-                  <View style={styles.airPillsContainer}>
-                    <View style={styles.airPillItem}>
-                      <Text style={styles.airPillKey}>PM2.5</Text>
-                      <Text style={styles.airPillVal}>{airData?.pm25 ?? 9.9} <Text style={styles.airPillUnit}>µg/m³</Text></Text>
-                    </View>
-                    <View style={styles.airPillDivider} />
-                    <View style={styles.airPillItem}>
-                      <Text style={styles.airPillKey}>PM10</Text>
-                      <Text style={styles.airPillVal}>{airData?.pm10 ?? 11} <Text style={styles.airPillUnit}>µg/m³</Text></Text>
-                    </View>
-                    {airData?.no2 !== undefined && (
-                      <>
-                        <View style={styles.airPillDivider} />
-                        <View style={styles.airPillItem}>
-                          <Text style={styles.airPillKey}>NO₂</Text>
-                          <Text style={styles.airPillVal}>{airData.no2} <Text style={styles.airPillUnit}>µg/m³</Text></Text>
-                        </View>
-                      </>
-                    )}
-                  </View>
-                </View>
-              </LinearGradient>
+                {/* Przycisk odświeżenia */}
+                <TouchableOpacity
+                  onPress={loadAirQuality}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.airBarRefreshBtn}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Odśwież jakość powietrza"
+                >
+                  {airLoading ? (
+                    <ActivityIndicator size="small" color="#23E5DB" />
+                  ) : (
+                    <MaterialCommunityIcons name="refresh" size={15} color="#23E5DB" />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
+      </header>
 
-        {/* 2. HERO SEARCH SECTION (Białe czyste tło z panoramicznym banerem i wyszukiwarką) */}
+      {/* 2. HERO SEARCH SECTION (Białe czyste tło z panoramicznym banerem i wyszukiwarką) */}
+      <section style={{ width: '100%' } as any}>
         <View style={styles.heroSearchSection}>
           <View style={styles.heroSearchInner}>
-            {/* Panoramiczny Baner WWW (1024x200, zoptymalizowany WebP, niezależny slot admina 'web') */}
+            {/* Panoramiczny Baner WWW (rotacja 6 motywów co 4s, zoptymalizowany WebP, niezależny slot admina 'web') */}
             {adminSettings?.adsEnabled !== false && (
               <View style={styles.bannerWrapper}>
-                <Image
-                  source={resolveBannerSource('web', adminSettings?.customBanners)}
-                  style={styles.heroBannerImage}
-                  resizeMode="contain"
-                />
+                {adminSettings?.customBanners?.web?.trim() ? (
+                  <Image
+                    source={resolveBannerSource('web', adminSettings?.customBanners)}
+                    style={styles.heroBannerImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <>
+                    {DEFAULT_WEB_BANNERS.map((bannerSrc, idx) => (
+                      <Image
+                        key={idx}
+                        source={bannerSrc}
+                        style={[
+                          styles.heroBannerImage,
+                          styles.carouselBannerImage,
+                          {
+                            opacity: currentBannerIndex === idx ? 1 : 0,
+                            pointerEvents: currentBannerIndex === idx ? 'auto' : 'none',
+                          },
+                        ]}
+                        resizeMode="contain"
+                      />
+                    ))}
+
+                    {/* Wskaźniki rotacji slajdów (kropki z możliwością kliknięcia) */}
+                    <View style={styles.bannerDotsContainer}>
+                      {DEFAULT_WEB_BANNERS.map((_, idx) => (
+                        <TouchableOpacity
+                          key={idx}
+                          onPress={() => setCurrentBannerIndex(idx)}
+                          style={[
+                            styles.bannerDot,
+                            currentBannerIndex === idx && styles.bannerDotActive,
+                          ]}
+                          activeOpacity={0.8}
+                          accessibilityLabel={`Baner ${idx + 1}`}
+                        />
+                      ))}
+                    </View>
+                  </>
+                )}
               </View>
             )}
 
@@ -634,6 +676,148 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
               </TouchableOpacity>
             </View>
 
+            {/* 3. MODUŁ MÓJ REWIR POD WYSZUKIWARKĄ (Geofencing, Promień & Alerty sąsiedzkie na WWW) */}
+            <LinearGradient
+              colors={['#FFFFFF', '#F0FDF4']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.rewirDesktopCard}
+            >
+              {/* Górny wiersz: Ikona, Tytuł, Zasięg, Licznik i Akcje */}
+              <View style={styles.rewirHeaderRow}>
+                <View style={styles.rewirHeaderLeft}>
+                  <View style={styles.rewirIconBubble}>
+                    <MaterialCommunityIcons name="map-marker-radius" size={24} color="#059669" />
+                  </View>
+                  <View style={styles.rewirHeaderTextGroup}>
+                    <View style={styles.rewirTitleRow}>
+                      <Text style={styles.rewirMainTitle}>
+                        Mój rewir:{' '}
+                        <Text style={styles.rewirHighlightText}>
+                          {getNeighborhoodDisplayValue(neighborhoodSettings)}
+                        </Text>
+                      </Text>
+                      <View style={styles.rewirCountBadge}>
+                        <MaterialCommunityIcons name="check-circle-outline" size={13} color="#059669" style={{ marginRight: 4 }} />
+                        <Text style={styles.rewirCountBadgeText}>
+                          {itemsInRewirCount}{' '}
+                          {itemsInRewirCount === 1
+                            ? 'ogłoszenie'
+                            : itemsInRewirCount >= 2 && itemsInRewirCount <= 4
+                            ? 'ogłoszenia'
+                            : 'ogłoszeń'}{' '}
+                          w rewirze
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.rewirSubDescription}>
+                      {getNeighborhoodSubtitle(neighborhoodSettings)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Prawa strona: Alerty i Konfiguracja */}
+                <View style={styles.rewirHeaderRight}>
+                  {onToggleAlerts && (
+                    <TouchableOpacity
+                      style={[
+                        styles.rewirAlertToggleBtn,
+                        neighborhoodSettings.alertsEnabled ? styles.rewirAlertOn : styles.rewirAlertOff,
+                      ]}
+                      onPress={onToggleAlerts}
+                      activeOpacity={0.8}
+                      accessibilityLabel="Przełącz alerty w rewirze"
+                    >
+                      <MaterialCommunityIcons
+                        name={neighborhoodSettings.alertsEnabled ? 'bell-ring' : 'bell-off'}
+                        size={15}
+                        color={neighborhoodSettings.alertsEnabled ? '#047857' : '#64748B'}
+                      />
+                      <Text
+                        style={[
+                          styles.rewirAlertToggleText,
+                          neighborhoodSettings.alertsEnabled
+                            ? styles.rewirAlertTextOn
+                            : styles.rewirAlertTextOff,
+                        ]}
+                      >
+                        {neighborhoodSettings.alertsEnabled ? 'Alerty WŁ.' : 'Alerty WYŁ.'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {onOpenNeighborhoodModal && (
+                    <TouchableOpacity
+                      style={styles.rewirSettingsBtn}
+                      onPress={onOpenNeighborhoodModal}
+                      activeOpacity={0.8}
+                      accessibilityLabel="Otwórz pełne ustawienia rewiru"
+                    >
+                      <MaterialCommunityIcons name="tune-vertical" size={16} color="#002F34" />
+                      <Text style={styles.rewirSettingsBtnText}>Dostosuj</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Dolny wiersz kontrolny: Suwak promienia + Szybki wybór obszaru (Chipsy) */}
+              <View style={styles.rewirControlsRow}>
+                {/* Suwak regulacji promienia */}
+                <View style={styles.rewirSliderBox}>
+                  <View style={styles.rewirSliderHeader}>
+                    <Text style={styles.rewirSliderLabel}>Promień poszukiwań:</Text>
+                    <Text style={styles.rewirSliderValue}>
+                      {clampNeighborhoodRadius(neighborhoodSettings.radiusKm)} km
+                    </Text>
+                  </View>
+                  <Slider
+                    style={styles.rewirSlider}
+                    minimumValue={1}
+                    maximumValue={MAX_NEIGHBORHOOD_RADIUS_KM}
+                    step={1}
+                    value={clampNeighborhoodRadius(neighborhoodSettings.radiusKm)}
+                    onValueChange={(val) => onChangeRadius?.(val)}
+                    minimumTrackTintColor={getNeighborhoodScope(neighborhoodSettings) === 'radius' ? '#10B981' : '#94A3B8'}
+                    maximumTrackTintColor="#E2E8F0"
+                    thumbTintColor={getNeighborhoodScope(neighborhoodSettings) === 'radius' ? '#059669' : '#64748B'}
+                  />
+                  <View style={styles.rewirSliderTicks}>
+                    <Text style={styles.rewirSliderTick}>1 km</Text>
+                    <Text style={styles.rewirSliderTick}>15 km</Text>
+                    <Text style={styles.rewirSliderTick}>30 km</Text>
+                    <Text style={styles.rewirSliderTick}>50 km</Text>
+                  </View>
+                </View>
+
+                {/* Szybki wybór szerszego obszaru (Chipsy) */}
+                <View style={styles.rewirChipsBox}>
+                  <Text style={styles.rewirChipsHeader}>Zasięg obszaru:</Text>
+                  <View style={styles.rewirChipsList}>
+                    {NEIGHBORHOOD_SCOPE_OPTIONS.map((opt) => {
+                      const isActive = getNeighborhoodScope(neighborhoodSettings) === opt.id;
+                      return (
+                        <TouchableOpacity
+                          key={opt.id}
+                          style={[styles.rewirScopeChip, isActive && styles.rewirScopeChipActive]}
+                          onPress={() => onSelectNeighborhoodScope?.(opt.id)}
+                          activeOpacity={0.8}
+                        >
+                          <MaterialCommunityIcons
+                            name={opt.icon}
+                            size={14}
+                            color={isActive ? '#FFFFFF' : '#047857'}
+                          />
+                          <Text style={[styles.rewirScopeChipText, isActive && styles.rewirScopeChipTextActive]}>
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              </View>
+            </LinearGradient>
+
             {/* Pasek ekologiczny i statystyki społeczności */}
             <View style={styles.heroStatsBadge}>
               <View style={styles.heroStatItem}>
@@ -659,7 +843,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
             </View>
           </View>
         </View>
-      </header>
+      </section>
 
       {/* 3. KATEGORIE GŁÓWNE */}
       <section style={{ width: '100%' } as any}>
@@ -1398,9 +1582,168 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
   webLogoImage: {
-    width: 127,
-    height: 85,
+    width: 108,
+    height: 72,
     filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))' as any,
+  },
+  airBarSection: {
+    width: '100%',
+    backgroundColor: 'rgba(2, 44, 34, 0.95)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(35, 229, 219, 0.16)',
+    paddingVertical: 7,
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+  } as any,
+  airBarInner: {
+    maxWidth: 1240,
+    width: '100%',
+    marginHorizontal: 'auto',
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  airBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  airBarIconBox: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: 'rgba(35, 229, 219, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(35, 229, 219, 0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  airBarTextGroup: {
+    justifyContent: 'center',
+  },
+  airBarTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  airBarTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  airBarCityBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    cursor: 'pointer' as any,
+  },
+  airBarCityText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  airBarLiveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    marginLeft: 2,
+  },
+  airBarLiveDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#10B981',
+  },
+  airBarLiveText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#6EE7B7',
+    letterSpacing: 0.5,
+  },
+  airBarSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  airBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  airBarAqiBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  airBarStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  airBarAqiText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  airBarMetricsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 8,
+  },
+  airBarMetricItem: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  airBarMetricKey: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  airBarMetricVal: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  airBarMetricUnit: {
+    fontSize: 9,
+    fontWeight: '400',
+    color: '#64748B',
+  },
+  airBarMetricDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  airBarRefreshBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(35, 229, 219, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(35, 229, 219, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer' as any,
   },
   topNavActions: {
     flexDirection: 'row',
@@ -1750,7 +2093,7 @@ const styles = StyleSheet.create({
   bannerWrapper: {
     width: '100%',
     maxWidth: 960,
-    aspectRatio: 1024 / 170,
+    aspectRatio: 1024 / 236,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     overflow: 'hidden',
@@ -1761,10 +2104,43 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
+    position: 'relative',
   },
   heroBannerImage: {
     width: '100%',
     height: '100%',
+  },
+  carouselBannerImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    // @ts-ignore Web CSS transition for smooth crossfade
+    transition: 'opacity 0.6s ease-in-out',
+  },
+  bannerDotsContainer: {
+    position: 'absolute',
+    bottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.32)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  bannerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+    marginHorizontal: 3,
+  },
+  bannerDotActive: {
+    width: 18,
+    backgroundColor: '#FFFFFF',
   },
   searchBarBox: {
     width: '100%',
@@ -1829,6 +2205,216 @@ const styles = StyleSheet.create({
   searchSubmitButtonText: {
     color: '#FFFFFF',
     fontSize: 15,
+    fontWeight: '700',
+  },
+  rewirDesktopCard: {
+    width: '100%',
+    maxWidth: 960,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#D1FAE5',
+    padding: 16,
+    marginTop: 16,
+    marginBottom: 4,
+    shadowColor: '#002F34',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+  },
+  rewirHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 12,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECFDF5',
+  },
+  rewirHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 280,
+    gap: 12,
+  },
+  rewirIconBubble: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#D1FAE5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rewirHeaderTextGroup: {
+    flex: 1,
+  },
+  rewirTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  rewirMainTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  rewirHighlightText: {
+    color: '#059669',
+    fontWeight: '900',
+  },
+  rewirCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  rewirCountBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#047857',
+  },
+  rewirSubDescription: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  rewirHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rewirAlertToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    cursor: 'pointer' as any,
+  },
+  rewirAlertOn: {
+    backgroundColor: '#D1FAE5',
+    borderColor: '#6EE7B7',
+  },
+  rewirAlertOff: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+  },
+  rewirAlertToggleText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  rewirAlertTextOn: {
+    color: '#047857',
+  },
+  rewirAlertTextOff: {
+    color: '#64748B',
+  },
+  rewirSettingsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    cursor: 'pointer' as any,
+  },
+  rewirSettingsBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#002F34',
+  },
+  rewirControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 20,
+    paddingTop: 12,
+  },
+  rewirSliderBox: {
+    flex: 1,
+    minWidth: 260,
+  },
+  rewirSliderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  rewirSliderLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  rewirSliderValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  rewirSlider: {
+    width: '100%',
+    height: 32,
+  },
+  rewirSliderTicks: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+  },
+  rewirSliderTick: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  rewirChipsBox: {
+    flex: 1,
+    minWidth: 260,
+  },
+  rewirChipsHeader: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+    marginBottom: 6,
+  },
+  rewirChipsList: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  rewirScopeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    cursor: 'pointer' as any,
+  },
+  rewirScopeChipActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  rewirScopeChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  rewirScopeChipTextActive: {
+    color: '#FFFFFF',
     fontWeight: '700',
   },
   heroStatsBadge: {

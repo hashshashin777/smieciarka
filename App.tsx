@@ -1468,6 +1468,43 @@ export default function App() {
             userCoords={userCoords}
             adminSettings={adminSettings}
             streakDays={streakDays}
+            neighborhoodSettings={neighborhoodSettings}
+            onOpenNeighborhoodModal={() => setIsNeighborhoodModalVisible(true)}
+            onChangeRadius={(val) => {
+              const clamped = clampNeighborhoodRadius(val);
+              const updated: NeighborhoodSettings = {
+                ...neighborhoodSettings,
+                radiusKm: clamped,
+                scope: 'radius',
+                label: getNeighborhoodLabel({
+                  ...neighborhoodSettings,
+                  radiusKm: clamped,
+                  scope: 'radius',
+                }),
+              };
+              setNeighborhoodSettings(updated);
+              StorageCache.saveNeighborhoodSettings(updated);
+            }}
+            onSelectNeighborhoodScope={(scope) => {
+              const updated: NeighborhoodSettings = {
+                ...neighborhoodSettings,
+                scope,
+                label: getNeighborhoodLabel({
+                  ...neighborhoodSettings,
+                  scope,
+                }),
+              };
+              setNeighborhoodSettings(updated);
+              StorageCache.saveNeighborhoodSettings(updated);
+            }}
+            onToggleAlerts={() => {
+              const updated: NeighborhoodSettings = {
+                ...neighborhoodSettings,
+                alertsEnabled: !neighborhoodSettings.alertsEnabled,
+              };
+              setNeighborhoodSettings(updated);
+              StorageCache.saveNeighborhoodSettings(updated);
+            }}
           />
         ) : (
           <>
