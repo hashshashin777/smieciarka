@@ -77,6 +77,7 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
   };
 
   const [region, setRegion] = React.useState(defaultRegion);
+  const [showEmptyNotice, setShowEmptyNotice] = React.useState(true);
 
   useEffect(() => {
     const currentCityKey = selectedCity ? `${selectedCity.id}:${selectedCity.latitude}:${selectedCity.longitude}` : '__gps__';
@@ -258,10 +259,10 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
       )}
 
       {/* Informacja o braku ogłoszeń na mapie (Cold Start) */}
-      {items.length === 0 && (
+      {items.length === 0 && showEmptyNotice && (
         <View style={[styles.emptyMapNotice, isDark && styles.emptyMapNoticeDark]}>
-          <MaterialCommunityIcons name="compass-off-outline" size={24} color={THEME.primary} />
-          <View style={{ flex: 1, marginLeft: 10 }}>
+          <MaterialCommunityIcons name="compass-off-outline" size={22} color={THEME.primary} />
+          <View style={{ flex: 1, marginLeft: 10, marginRight: 6 }}>
             <Text style={[styles.emptyMapTitle, isDark && styles.emptyMapTitleDark]}>
               Brak wystawek w tym widoku mapy
             </Text>
@@ -269,6 +270,15 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
               Przesuń mapę w stronę centrum lub dodaj pierwsze znalezisko!
             </Text>
           </View>
+          <TouchableOpacity
+            style={styles.closeEmptyNoticeBtn}
+            onPress={() => setShowEmptyNotice(false)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Zamknij informację o braku wystawek"
+          >
+            <MaterialCommunityIcons name="close" size={20} color={isDark ? '#94A3B8' : '#64748B'} />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -770,6 +780,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
     zIndex: 25,
+  },
+  closeEmptyNoticeBtn: {
+    padding: 4,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyMapNoticeDark: {
     backgroundColor: '#1E293B',

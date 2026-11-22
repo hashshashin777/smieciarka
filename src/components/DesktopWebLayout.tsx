@@ -324,7 +324,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                   size={20}
                   color={
                     activeTab === 'all' || activeTab === 'wystawka' || activeTab === 'oddam'
-                      ? '#23E5DB'
+                      ? '#FEF3C7'
                       : '#FFFFFF'
                   }
                 />
@@ -350,7 +350,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 <MaterialCommunityIcons
                   name="map-outline"
                   size={20}
-                  color={activeTab === 'map' ? '#23E5DB' : '#FFFFFF'}
+                  color={activeTab === 'map' ? '#FEF3C7' : '#FFFFFF'}
                 />
                 <Text
                   style={[
@@ -373,7 +373,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 <MaterialCommunityIcons
                   name="forum-outline"
                   size={20}
-                  color={activeTab === 'board' ? '#23E5DB' : '#FFFFFF'}
+                  color={activeTab === 'board' ? '#FEF3C7' : '#FFFFFF'}
                 />
                 <Text
                   style={[
@@ -400,7 +400,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                     savedItemIds.length > 0
                       ? '#EF4444'
                       : activeTab === 'saved'
-                      ? '#23E5DB'
+                      ? '#FEF3C7'
                       : '#FFFFFF'
                   }
                 />
@@ -1763,8 +1763,8 @@ const styles = StyleSheet.create({
     cursor: 'pointer' as any,
   },
   navLinkActive: {
-    backgroundColor: 'rgba(35, 229, 219, 0.20)',
-    borderColor: 'rgba(35, 229, 219, 0.45)',
+    backgroundColor: 'rgba(254, 243, 199, 0.22)',
+    borderColor: 'rgba(254, 243, 199, 0.50)',
     backdropFilter: 'blur(8px)',
   } as any,
   navLinkText: {
@@ -1773,7 +1773,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   navLinkTextActive: {
-    color: '#23E5DB',
+    color: '#FEF3C7',
     fontWeight: '700',
   },
   adminPill: {
@@ -1782,17 +1782,19 @@ const styles = StyleSheet.create({
     borderColor: '#FBBF24',
   },
   addCtaButton: {
-    backgroundColor: '#23E5DB',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    shadowColor: '#23E5DB',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
     cursor: 'pointer' as any,
   },
   addCtaButtonText: {
