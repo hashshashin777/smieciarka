@@ -41,7 +41,7 @@ export const BANNER_SLOTS: BannerSlotMeta[] = [
     label: 'Baner na Mapie',
     locationHint: 'Góra ekranu w zakładce Mapa',
     defaultLabel: 'Domyślny baner Mapy',
-    defaultSource: require('../assets/map_ad_banner.webp'),
+    defaultSource: require('../assets/map_ad_banner.jpg'),
   },
   {
     id: 'list',
