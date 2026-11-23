@@ -15,7 +15,7 @@ interface EcoImpactCardProps {
 const WEEKDAYS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
 const MONTHS_SHORT_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
 
-function getCalendarWeekDays(streakDays: number) {
+export function getCalendarWeekDays(streakDays: number) {
   const now = new Date();
   const todayIndex = (now.getDay() + 6) % 7; // 0 = Pn .. 6 = Nd
   const monday = new Date(now);

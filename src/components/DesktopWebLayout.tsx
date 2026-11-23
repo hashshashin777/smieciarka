@@ -33,6 +33,7 @@ import {
 } from '../services/storageCache';
 import { resolveBannerImages } from '../constants/banners';
 import { fetchAirQuality, AirQualityData } from '../services/airQuality';
+import { getCalendarWeekDays } from './EcoImpactCard';
 import { WebLeafletMap } from './WebLeafletMap';
 
 
@@ -145,6 +146,12 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAirQuality();
   }, [loadAirQuality]);
+
+  // Dni kalendarzowe dla modułu serii aktywności
+  const { days: calendarDays, todayFormatted } = useMemo(
+    () => getCalendarWeekDays(streakDays),
+    [streakDays]
+  );
 
   // Rotacja banerów na stronie głównej (custom lub domyślne, czas wg adminSettings.bannerIntervalSeconds)
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
@@ -536,6 +543,71 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                   <MaterialCommunityIcons name="refresh" size={13} color="#059669" />
                 )}
               </TouchableOpacity>
+            </View>
+
+            {/* Lekki moduł Seria Aktywności pod modułem Czyste Powietrze */}
+            <View style={styles.heroStreakBadge}>
+              {/* Płomień i liczba dni z rzędu */}
+              <View style={styles.heroStreakStatItem}>
+                <MaterialCommunityIcons name="fire" size={17} color="#F59E0B" />
+                <Text style={styles.heroStreakText}>
+                  Seria: <Text style={styles.heroStreakBold}>{streakDays} {streakDays === 1 ? 'dzień' : 'dni'} z rzędu</Text>
+                </Text>
+              </View>
+
+              <View style={styles.heroAirDot} />
+
+              {/* Dzisiejsza data */}
+              <View style={styles.heroStreakStatItem}>
+                <MaterialCommunityIcons name="calendar-today" size={13} color="#059669" />
+                <Text style={styles.heroStreakText}>{todayFormatted}</Text>
+              </View>
+
+              <View style={styles.heroAirDot} />
+
+              {/* Tydzień kalendarzowy Pn-Nd w lekkim wydaniu */}
+              <View style={styles.heroStreakDaysRow}>
+                {calendarDays.map((day) => (
+                  <View key={day.label} style={styles.heroStreakDayPill}>
+                    <Text
+                      style={[
+                        styles.heroStreakDayLabel,
+                        day.isToday && styles.heroStreakDayLabelToday,
+                      ]}
+                    >
+                      {day.label}
+                    </Text>
+                    <View
+                      style={[
+                        styles.heroStreakDayCircle,
+                        day.isCompleted && !day.isToday && styles.heroStreakDayDone,
+                        day.isToday && styles.heroStreakDayToday,
+                        day.isFuture && styles.heroStreakDayFuture,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.heroStreakDayNum,
+                          day.isCompleted && !day.isToday && styles.heroStreakDayNumDone,
+                          day.isToday && styles.heroStreakDayNumToday,
+                          day.isFuture && styles.heroStreakDayNumFuture,
+                        ]}
+                      >
+                        {day.dayNumber}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.heroAirDot} />
+
+              {/* Tekst motywacyjny */}
+              <Text style={styles.heroStreakMotivational}>
+                {streakDays >= 5
+                  ? 'Świetna regularność Zero-Waste!'
+                  : 'Wracaj codziennie po nowe wystawki'}
+              </Text>
             </View>
 
             {/* Panoramiczny Baner WWW (rotacja motywów z czasem z adminSettings, zoptymalizowany WebP, slot admina 'web') */}
@@ -1553,7 +1625,7 @@ const styles = StyleSheet.create({
   heroAirBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 8,
     gap: 12,
     backgroundColor: '#F0FDF4',
     paddingVertical: 6,
@@ -1612,6 +1684,97 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5, 150, 105, 0.08)',
     marginLeft: 2,
     cursor: 'pointer' as any,
+  },
+  // Lekki moduł serii dni pod modułem czystego powietrza (heroStreakBadge)
+  heroStreakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+    backgroundColor: '#F0FDF4',
+    paddingVertical: 5,
+    paddingHorizontal: 18,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+  },
+  heroStreakStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  heroStreakText: {
+    color: '#047857',
+    fontSize: 13,
+  },
+  heroStreakBold: {
+    fontWeight: '700',
+    color: '#064E3B',
+  },
+  heroStreakDaysRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  heroStreakDayPill: {
+    alignItems: 'center',
+    gap: 1,
+  },
+  heroStreakDayLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#059669',
+    textTransform: 'uppercase',
+  },
+  heroStreakDayLabelToday: {
+    color: '#D97706',
+    fontWeight: '800',
+  },
+  heroStreakDayCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DCFCE7',
+  },
+  heroStreakDayDone: {
+    backgroundColor: '#A7F3D0',
+  },
+  heroStreakDayToday: {
+    backgroundColor: '#FDE68A',
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+  },
+  heroStreakDayFuture: {
+    backgroundColor: 'rgba(203, 213, 225, 0.4)',
+  },
+  heroStreakDayNum: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#064E3B',
+  },
+  heroStreakDayNumDone: {
+    color: '#064E3B',
+  },
+  heroStreakDayNumToday: {
+    color: '#92400E',
+    fontWeight: '900',
+  },
+  heroStreakDayNumFuture: {
+    color: '#94A3B8',
+    fontWeight: '500',
+  },
+  heroStreakMotivational: {
+    fontSize: 12,
+    color: '#047857',
+    fontStyle: 'italic',
   },
   topNavActions: {
     flexDirection: 'row',
