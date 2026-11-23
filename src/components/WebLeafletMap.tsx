@@ -222,19 +222,18 @@ export const WebLeafletMap: React.FC<WebLeafletMapProps> = ({
       display: block;
       width: 100%;
       padding: 7px 0;
-      background: #BEF264;
-      color: #102B25;
+      background: #064E3B;
+      color: #FFFFFF;
       font-size: 12px;
       font-weight: 700;
       text-align: center;
-      border: 1px solid #ADDE5E;
+      border: none;
       border-radius: 8px;
       cursor: pointer;
-      text-decoration: none;
       transition: background 0.15s ease;
     }
     .popup-btn:hover {
-      background: #ADDE5E;
+      background: #047857;
     }
   </style>
 </head>

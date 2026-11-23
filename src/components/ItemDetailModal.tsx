@@ -412,7 +412,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             {/* Action buttons (Nawiguj + Udostępnij) */}
             <View style={styles.actionContainer}>
               <TouchableOpacity style={styles.navigateBtn} onPress={handleNavigate} activeOpacity={0.85}>
-                <MaterialCommunityIcons name="navigation-variant" size={20} color="#102B25" />
+                <MaterialCommunityIcons name="navigation-variant" size={20} color="#FFFFFF" />
                 <Text style={styles.navigateBtnText}>Nawiguj do celu</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.shareRowBtn} onPress={handleShare} activeOpacity={0.85}>
@@ -710,19 +710,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#BEF264',
-    borderWidth: 1,
-    borderColor: '#ADDE5E',
+    backgroundColor: '#0F172A',
     paddingVertical: 14,
     borderRadius: 14,
-    shadowColor: '#ADDE5E',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
   },
   navigateBtnText: {
-    color: '#102B25',
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
   },
