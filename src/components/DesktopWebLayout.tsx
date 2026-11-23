@@ -141,14 +141,10 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
     }
   }, [airLat, airLon, cityLabel]);
 
-  // Widoczność modułu czystego powietrza na stronie WWW (ukryty na życzenie)
-  const showAirQuality = false;
-
   useEffect(() => {
-    if (showAirQuality) {
-      loadAirQuality();
-    }
-  }, [loadAirQuality, showAirQuality]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadAirQuality();
+  }, [loadAirQuality]);
 
   // Rotacja banerów na stronie głównej (custom lub domyślne, czas wg adminSettings.bannerIntervalSeconds)
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
@@ -466,116 +462,82 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
             </View>
           </View>
         </View>
-
-        {/* MODUŁ CZYSTE POWIETRZE POD PASKIEM NAWIGACYJNYM (UKRYTY NA ŻYCZENIE) */}
-        {showAirQuality && (
-          <View style={styles.airBarSection}>
-            <View style={styles.airBarInner}>
-              {/* Lewa strona: Ikona, Tytuł i Wybór miasta */}
-              <View style={styles.airBarLeft}>
-                <View style={styles.airBarIconBox}>
-                  <MaterialCommunityIcons name="weather-windy" size={18} color="#23E5DB" />
-                </View>
-                <View style={styles.airBarTextGroup}>
-                  <View style={styles.airBarTitleRow}>
-                    <Text style={styles.airBarTitle}>Jakość powietrza:</Text>
-                    <TouchableOpacity
-                      onPress={onOpenCityPicker}
-                      style={styles.airBarCityBtn}
-                      activeOpacity={0.7}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Zmień miasto dla jakości powietrza, aktualnie: ${cityLabel}`}
-                    >
-                      <Text style={styles.airBarCityText}>{cityLabel}</Text>
-                      <MaterialCommunityIcons name="chevron-down" size={14} color="#23E5DB" />
-                    </TouchableOpacity>
-                    <View style={styles.airBarLiveBadge}>
-                      <View style={styles.airBarLiveDot} />
-                      <Text style={styles.airBarLiveText}>GPS NA ŻYWO</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.airBarSub} numberOfLines={1}>
-                    {airData?.aqiDescription || 'Monitorowanie jakości powietrza w Twojej okolicy'}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Prawa strona: AQI, parametry PM2.5, PM10, NO2 i odświeżanie */}
-              <View style={styles.airBarRight}>
-                {/* Odznaka AQI */}
-                <View
-                  style={[
-                    styles.airBarAqiBadge,
-                    {
-                      backgroundColor: airData ? `${airData.aqiColor}22` : 'rgba(52, 211, 153, 0.16)',
-                      borderColor: airData ? `${airData.aqiColor}55` : 'rgba(52, 211, 153, 0.35)',
-                    },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.airBarStatusDot,
-                      { backgroundColor: airData?.aqiColor || '#34D399' },
-                    ]}
-                  />
-                  <Text style={[styles.airBarAqiText, { color: airData?.aqiColor || '#34D399' }]}>
-                    AQI {airData?.aqi ?? 30} • {airData?.aqiLabel || 'Dobra'}
-                  </Text>
-                </View>
-
-                {/* Parametry cząstek PM2.5, PM10, NO2 */}
-                <View style={styles.airBarMetricsGroup}>
-                  <View style={styles.airBarMetricItem}>
-                    <Text style={styles.airBarMetricKey}>PM2.5</Text>
-                    <Text style={styles.airBarMetricVal}>
-                      {airData?.pm25 ?? 9.9} <Text style={styles.airBarMetricUnit}>µg/m³</Text>
-                    </Text>
-                  </View>
-                  <View style={styles.airBarMetricDivider} />
-                  <View style={styles.airBarMetricItem}>
-                    <Text style={styles.airBarMetricKey}>PM10</Text>
-                    <Text style={styles.airBarMetricVal}>
-                      {airData?.pm10 ?? 11} <Text style={styles.airBarMetricUnit}>µg/m³</Text>
-                    </Text>
-                  </View>
-                  {airData?.no2 !== undefined && (
-                    <>
-                      <View style={styles.airBarMetricDivider} />
-                      <View style={styles.airBarMetricItem}>
-                        <Text style={styles.airBarMetricKey}>NO₂</Text>
-                        <Text style={styles.airBarMetricVal}>
-                          {airData.no2} <Text style={styles.airBarMetricUnit}>µg/m³</Text>
-                        </Text>
-                      </View>
-                    </>
-                  )}
-                </View>
-
-                {/* Przycisk odświeżenia */}
-                <TouchableOpacity
-                  onPress={loadAirQuality}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  style={styles.airBarRefreshBtn}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel="Odśwież jakość powietrza"
-                >
-                  {airLoading ? (
-                    <ActivityIndicator size="small" color="#23E5DB" />
-                  ) : (
-                    <MaterialCommunityIcons name="refresh" size={15} color="#23E5DB" />
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        )}
       </header>
 
       {/* 2. HERO SEARCH SECTION (Białe czyste tło z panoramicznym banerem i wyszukiwarką) */}
       <section style={{ width: '100%' } as any}>
         <View style={styles.heroSearchSection}>
           <View style={styles.heroSearchInner}>
+            {/* Lekki moduł Czyste Powietrze nad banerem (łagodny styl spójny ze statystykami ekologicznymi) */}
+            <View style={styles.heroAirBadge}>
+              {/* Ikona i miasto */}
+              <View style={styles.heroAirStatItem}>
+                <MaterialCommunityIcons name="weather-windy" size={15} color="#059669" />
+                <TouchableOpacity
+                  onPress={onOpenCityPicker}
+                  style={styles.heroAirCityBtn}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Zmień miasto dla jakości powietrza, aktualnie: ${cityLabel}`}
+                >
+                  <Text style={styles.heroAirStatText}>
+                    Czyste powietrze: <Text style={styles.heroAirStatBold}>{cityLabel}</Text>
+                  </Text>
+                  <MaterialCommunityIcons name="chevron-down" size={13} color="#059669" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.heroAirDot} />
+
+              {/* Status jakości */}
+              <View style={styles.heroAirStatItem}>
+                <View
+                  style={[
+                    styles.heroAirStatusDot,
+                    { backgroundColor: airData?.aqiColor || '#10B981' },
+                  ]}
+                />
+                <Text style={styles.heroAirStatText}>
+                  Jakość: <Text style={[styles.heroAirStatBold, { color: airData?.aqiColor || '#064E3B' }]}>{airData?.aqiLabel || 'Dobra'}</Text>
+                  {airData?.aqi !== undefined && (
+                    <Text style={styles.heroAirSubBold}> (AQI {airData.aqi})</Text>
+                  )}
+                </Text>
+              </View>
+
+              <View style={styles.heroAirDot} />
+
+              {/* Pomiary pyłów PM2.5 i PM10 */}
+              <View style={styles.heroAirStatItem}>
+                <Text style={styles.heroAirStatText}>
+                  PM2.5: <Text style={styles.heroAirStatBold}>{airData?.pm25 ?? 8.4} µg/m³</Text>
+                </Text>
+              </View>
+
+              <View style={styles.heroAirDot} />
+
+              <View style={styles.heroAirStatItem}>
+                <Text style={styles.heroAirStatText}>
+                  PM10: <Text style={styles.heroAirStatBold}>{airData?.pm10 ?? 12.1} µg/m³</Text>
+                </Text>
+              </View>
+
+              {/* Przycisk odświeżenia */}
+              <TouchableOpacity
+                onPress={loadAirQuality}
+                style={styles.heroAirRefreshBtn}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Odśwież dane jakości powietrza"
+              >
+                {airLoading ? (
+                  <ActivityIndicator size="small" color="#059669" style={{ transform: [{ scale: 0.65 }] }} />
+                ) : (
+                  <MaterialCommunityIcons name="refresh" size={13} color="#059669" />
+                )}
+              </TouchableOpacity>
+            </View>
+
             {/* Panoramiczny Baner WWW (rotacja motywów z czasem z adminSettings, zoptymalizowany WebP, slot admina 'web') */}
             {adminSettings?.adsEnabled !== false && (
               <View style={styles.bannerWrapper}>
@@ -1587,163 +1549,68 @@ const styles = StyleSheet.create({
     height: 72,
     filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))' as any,
   },
-  airBarSection: {
-    width: '100%',
-    backgroundColor: 'rgba(2, 44, 34, 0.95)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(35, 229, 219, 0.16)',
-    paddingVertical: 7,
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-  } as any,
-  airBarInner: {
-    maxWidth: 1240,
-    width: '100%',
-    marginHorizontal: 'auto',
-    paddingHorizontal: 20,
+  // Moduł czystego powietrza nad banerem w łagodnym stylu (heroAirBadge)
+  heroAirBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
+    marginBottom: 14,
     gap: 12,
-  },
-  airBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  airBarIconBox: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: 'rgba(35, 229, 219, 0.14)',
+    backgroundColor: '#F0FDF4',
+    paddingVertical: 6,
+    paddingHorizontal: 18,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(35, 229, 219, 0.28)',
-    alignItems: 'center',
+    borderColor: '#DCFCE7',
+    flexWrap: 'wrap',
     justifyContent: 'center',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
   },
-  airBarTextGroup: {
-    justifyContent: 'center',
-  },
-  airBarTitleRow: {
+  heroAirCityBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-  },
-  airBarTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  airBarCityBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
+    gap: 3,
     cursor: 'pointer' as any,
   },
-  airBarCityText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  airBarLiveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.4)',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 6,
-    marginLeft: 2,
-  },
-  airBarLiveDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: '#10B981',
-  },
-  airBarLiveText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#6EE7B7',
-    letterSpacing: 0.5,
-  },
-  airBarSub: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  airBarRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  airBarAqiBadge: {
+  heroAirStatItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 3.5,
-    borderRadius: 10,
-    borderWidth: 1,
   },
-  airBarStatusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  heroAirDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#86EFAC',
   },
-  airBarAqiText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.2,
+  heroAirStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
-  airBarMetricsGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.28)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    gap: 8,
+  heroAirStatText: {
+    color: '#047857',
+    fontSize: 13,
   },
-  airBarMetricItem: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-  },
-  airBarMetricKey: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  airBarMetricVal: {
-    fontSize: 11,
+  heroAirStatBold: {
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#064E3B',
   },
-  airBarMetricUnit: {
-    fontSize: 9,
-    fontWeight: '400',
-    color: '#64748B',
+  heroAirSubBold: {
+    fontWeight: '600',
+    color: '#047857',
+    fontSize: 12,
   },
-  airBarMetricDivider: {
-    width: 1,
-    height: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  airBarRefreshBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(35, 229, 219, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(35, 229, 219, 0.25)',
+  heroAirRefreshBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 3,
+    borderRadius: 12,
+    backgroundColor: 'rgba(5, 150, 105, 0.08)',
+    marginLeft: 2,
     cursor: 'pointer' as any,
   },
   topNavActions: {
