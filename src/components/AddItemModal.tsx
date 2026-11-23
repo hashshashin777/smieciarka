@@ -218,7 +218,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
             <Text style={styles.topBarTitle}>Dodaj do Śmieciarki</Text>
             <TouchableOpacity onPress={handleSubmit} style={styles.publishBtn} disabled={isSubmitting}>
               {isSubmitting ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color="#102B25" />
               ) : (
                 <Text style={styles.publishBtnText}>Dodaj</Text>
               )}
@@ -402,7 +402,9 @@ const styles = StyleSheet.create({
     color: THEME.text,
   },
   publishBtn: {
-    backgroundColor: THEME.primary,
+    backgroundColor: '#BEF264',
+    borderWidth: 1,
+    borderColor: '#ADDE5E',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
@@ -412,7 +414,7 @@ const styles = StyleSheet.create({
   publishBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#102B25',
   },
   scrollContent: {
     padding: 20,

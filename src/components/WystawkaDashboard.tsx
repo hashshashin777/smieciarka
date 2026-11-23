@@ -469,9 +469,9 @@ export const WystawkaDashboard: React.FC<WystawkaDashboardProps> = ({
                   step={1}
                   value={clampNeighborhoodRadius(neighborhoodSettings.radiusKm)}
                   onValueChange={(val) => onChangeRadius?.(val)}
-                  minimumTrackTintColor={getNeighborhoodScope(neighborhoodSettings) === 'radius' ? '#10B981' : '#94A3B8'}
+                  minimumTrackTintColor={getNeighborhoodScope(neighborhoodSettings) === 'radius' ? '#BEF264' : '#94A3B8'}
                   maximumTrackTintColor={isDark ? '#334155' : '#E2E8F0'}
-                  thumbTintColor={getNeighborhoodScope(neighborhoodSettings) === 'radius' ? '#059669' : '#64748B'}
+                  thumbTintColor={getNeighborhoodScope(neighborhoodSettings) === 'radius' ? '#ADDE5E' : '#64748B'}
                 />
                 <View style={styles.sliderLabelsRow}>
                   <Text style={styles.sliderLabelMin}>1 km</Text>
@@ -495,7 +495,7 @@ export const WystawkaDashboard: React.FC<WystawkaDashboardProps> = ({
                       <MaterialCommunityIcons
                         name={opt.icon}
                         size={13}
-                        color={isActive ? '#FFFFFF' : '#475569'}
+                        color={isActive ? '#102B25' : '#475569'}
                       />
                       <Text style={[styles.scopeChipText, isActive && styles.scopeChipTextActive]}>
                         {opt.label}
@@ -1177,8 +1177,8 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
   },
   scopeChipActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+    backgroundColor: '#BEF264',
+    borderColor: '#ADDE5E',
   },
   scopeChipText: {
     fontFamily: APP_FONT,
@@ -1187,7 +1187,8 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   scopeChipTextActive: {
-    color: '#FFFFFF',
+    color: '#102B25',
+    fontWeight: '800',
   },
 
   // 3. Quick 4 Tiles

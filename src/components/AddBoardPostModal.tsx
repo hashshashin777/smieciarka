@@ -214,7 +214,9 @@ const styles = StyleSheet.create({
     color: THEME.text,
   },
   publishBtn: {
-    backgroundColor: THEME.primary,
+    backgroundColor: '#BEF264',
+    borderWidth: 1,
+    borderColor: '#ADDE5E',
     paddingVertical: 8,
     paddingHorizontal: 18,
     borderRadius: 20,
@@ -224,7 +226,7 @@ const styles = StyleSheet.create({
   publishBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#102B25',
   },
   scrollContent: {
     padding: 20,

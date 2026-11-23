@@ -672,7 +672,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 accessibilityLabel="Wykonaj wyszukiwanie"
               >
                 <Text style={styles.searchSubmitButtonText}>Szukaj</Text>
-                <MaterialCommunityIcons name="magnify" size={20} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                <MaterialCommunityIcons name="magnify" size={20} color="#102B25" style={{ marginLeft: 6 }} />
               </TouchableOpacity>
             </View>
 
@@ -687,7 +687,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
               <View style={styles.rewirHeaderRow}>
                 <View style={styles.rewirHeaderLeft}>
                   <View style={styles.rewirIconBubble}>
-                    <MaterialCommunityIcons name="map-marker-radius" size={24} color="#059669" />
+                    <MaterialCommunityIcons name="map-marker-radius" size={24} color="#102B25" />
                   </View>
                   <View style={styles.rewirHeaderTextGroup}>
                     <View style={styles.rewirTitleRow}>
@@ -698,7 +698,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                         </Text>
                       </Text>
                       <View style={styles.rewirCountBadge}>
-                        <MaterialCommunityIcons name="check-circle-outline" size={13} color="#059669" style={{ marginRight: 4 }} />
+                        <MaterialCommunityIcons name="check-circle-outline" size={13} color="#102B25" style={{ marginRight: 4 }} />
                         <Text style={styles.rewirCountBadgeText}>
                           {itemsInRewirCount}{' '}
                           {itemsInRewirCount === 1
@@ -753,7 +753,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                       activeOpacity={0.8}
                       accessibilityLabel="Otwórz pełne ustawienia rewiru"
                     >
-                      <MaterialCommunityIcons name="tune-vertical" size={16} color="#002F34" />
+                      <MaterialCommunityIcons name="tune-vertical" size={16} color="#102B25" />
                       <Text style={styles.rewirSettingsBtnText}>Dostosuj</Text>
                     </TouchableOpacity>
                   )}
@@ -805,7 +805,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                           <MaterialCommunityIcons
                             name={opt.icon}
                             size={14}
-                            color={isActive ? '#FFFFFF' : '#047857'}
+                            color={isActive ? '#102B25' : '#047857'}
                           />
                           <Text style={[styles.rewirScopeChipText, isActive && styles.rewirScopeChipTextActive]}>
                             {opt.label}
@@ -821,21 +821,21 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
             {/* Pasek ekologiczny i statystyki społeczności */}
             <View style={styles.heroStatsBadge}>
               <View style={styles.heroStatItem}>
-                <MaterialCommunityIcons name="account-group-outline" size={16} color="#059669" />
+                <MaterialCommunityIcons name="account-group-outline" size={16} color="#102B25" />
                 <Text style={styles.heroStatText}>
                   <Text style={styles.heroStatBold}>{usersCount}</Text> sąsiadów online
                 </Text>
               </View>
               <View style={styles.heroStatDot} />
               <View style={styles.heroStatItem}>
-                <MaterialCommunityIcons name="recycle" size={16} color="#059669" />
+                <MaterialCommunityIcons name="recycle" size={16} color="#102B25" />
                 <Text style={styles.heroStatText}>
                   <Text style={styles.heroStatBold}>{ecoStats.itemsRescued}</Text> uratowanych rzeczy
                 </Text>
               </View>
               <View style={styles.heroStatDot} />
               <View style={styles.heroStatItem}>
-                <MaterialCommunityIcons name="leaf" size={16} color="#059669" />
+                <MaterialCommunityIcons name="leaf" size={16} color="#102B25" />
                 <Text style={styles.heroStatText}>
                   <Text style={styles.heroStatBold}>{ecoStats.co2SavedKg} kg</Text> zaoszczędzonego CO₂
                 </Text>
@@ -1376,7 +1376,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                   accessibilityRole="button"
                   accessibilityLabel="Dodaj nowy wpis na tablicę"
                 >
-                  <MaterialCommunityIcons name="plus" size={18} color="#FFFFFF" />
+                  <MaterialCommunityIcons name="plus" size={18} color="#102B25" />
                   <Text style={styles.addBoardPostBtnText}>Dodaj wpis na tablicę</Text>
                 </TouchableOpacity>
               </View>
@@ -2199,7 +2199,9 @@ const styles = StyleSheet.create({
     maxWidth: 180,
   },
   searchSubmitButton: {
-    backgroundColor: '#002F34',
+    backgroundColor: '#BEF264',
+    borderWidth: 1,
+    borderColor: '#ADDE5E',
     paddingHorizontal: 28,
     height: 48,
     borderRadius: 8,
@@ -2207,9 +2209,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer' as any,
+    shadowColor: '#ADDE5E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
   },
   searchSubmitButtonText: {
-    color: '#FFFFFF',
+    color: '#102B25',
     fontSize: 15,
     fontWeight: '700',
   },
@@ -2249,7 +2255,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#D1FAE5',
+    backgroundColor: '#F2FCE0',
+    borderWidth: 1,
+    borderColor: '#BEF264',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2268,23 +2276,23 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   rewirHighlightText: {
-    color: '#059669',
+    color: '#102B25',
     fontWeight: '900',
   },
   rewirCountBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#F2FCE0',
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: '#BEF264',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
   },
   rewirCountBadgeText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#047857',
+    fontWeight: '700',
+    color: '#102B25',
   },
   rewirSubDescription: {
     fontSize: 12,
@@ -2307,8 +2315,8 @@ const styles = StyleSheet.create({
     cursor: 'pointer' as any,
   },
   rewirAlertOn: {
-    backgroundColor: '#D1FAE5',
-    borderColor: '#6EE7B7',
+    backgroundColor: '#F2FCE0',
+    borderColor: '#BEF264',
   },
   rewirAlertOff: {
     backgroundColor: '#F1F5F9',
@@ -2319,7 +2327,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   rewirAlertTextOn: {
-    color: '#047857',
+    color: '#102B25',
   },
   rewirAlertTextOff: {
     color: '#64748B',
@@ -2328,9 +2336,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F2FCE0',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#BEF264',
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 10,
@@ -2338,8 +2346,8 @@ const styles = StyleSheet.create({
   },
   rewirSettingsBtnText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#002F34',
+    fontWeight: '700',
+    color: '#102B25',
   },
   rewirControlsRow: {
     flexDirection: 'row',
@@ -2411,8 +2419,8 @@ const styles = StyleSheet.create({
     cursor: 'pointer' as any,
   },
   rewirScopeChipActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+    backgroundColor: '#BEF264',
+    borderColor: '#ADDE5E',
   },
   rewirScopeChipText: {
     fontSize: 12,
@@ -2420,7 +2428,7 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   rewirScopeChipTextActive: {
-    color: '#FFFFFF',
+    color: '#102B25',
     fontWeight: '700',
   },
   heroStatsBadge: {
@@ -2428,12 +2436,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 18,
     gap: 14,
-    backgroundColor: '#F0FDF4',
+    backgroundColor: '#F2FCE0',
     paddingVertical: 7,
     paddingHorizontal: 20,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#DCFCE7',
+    borderColor: '#BEF264',
   },
   heroStatItem: {
     flexDirection: 'row',
@@ -2803,7 +2811,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   addBoardPostBtn: {
-    backgroundColor: '#059669',
+    backgroundColor: '#BEF264',
+    borderWidth: 1,
+    borderColor: '#ADDE5E',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
@@ -2811,9 +2821,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     cursor: 'pointer' as any,
+    shadowColor: '#ADDE5E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
   },
   addBoardPostBtnText: {
-    color: '#FFFFFF',
+    color: '#102B25',
     fontSize: 14,
     fontWeight: '700',
   },
