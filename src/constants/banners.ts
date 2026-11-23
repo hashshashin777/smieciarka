@@ -21,13 +21,22 @@ export const DEFAULT_WEB_BANNERS: ImageSourcePropType[] = [
   require('../assets/web_banner_6.webp'),
 ];
 
+export const DEFAULT_HOME_BANNERS: ImageSourcePropType[] = [
+  require('../assets/mobile_banner_1.webp'),
+  require('../assets/mobile_banner_2.webp'),
+  require('../assets/mobile_banner_3.webp'),
+  require('../assets/mobile_banner_4.webp'),
+  require('../assets/mobile_banner_5.webp'),
+  require('../assets/mobile_banner_6.webp'),
+];
+
 export const BANNER_SLOTS: BannerSlotMeta[] = [
   {
     id: 'home',
     label: 'Baner Główny – Pulpit (Telefon / Aplikacja)',
     locationHint: 'Główny baner na telefonach i w aplikacji mobilnej (jeśli brak banera WWW, wyświetli się też na komputerze)',
-    defaultLabel: 'Domyślny baner aplikacji mobilnej',
-    defaultSource: require('../assets/mobile_ad_banner.webp'),
+    defaultLabel: 'Rotujące banery aplikacji mobilnej (6 motywów, 1024×237, co 3s)',
+    defaultSource: require('../assets/mobile_banner_1.webp'),
   },
   {
     id: 'web',
@@ -112,12 +121,9 @@ export function resolveBannerImages(
     return DEFAULT_WEB_BANNERS;
   }
 
-  // I odwrotnie: jeśli slot 'web' ma własne banery, a 'home' nie ma – używamy banerów z 'web' na pulpicie aplikacji!
+  // Pulpit aplikacji mobilnej (jeśli brak własnych banerów, rotacja 6 domyślnych motywów)
   if (slotId === 'home') {
-    const webUris = getCustomBannerList('web', customBanners);
-    if (webUris.length > 0) {
-      return webUris.map((uri) => ({ uri }));
-    }
+    return DEFAULT_HOME_BANNERS;
   }
 
   return [BANNER_SLOTS_BY_ID[slotId].defaultSource];

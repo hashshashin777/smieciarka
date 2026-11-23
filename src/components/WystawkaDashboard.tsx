@@ -108,7 +108,7 @@ export const WystawkaDashboard: React.FC<WystawkaDashboardProps> = ({
   userCoords = null,
   adsEnabled = true,
   customBanners,
-  bannerIntervalSeconds = 4,
+  bannerIntervalSeconds = 3,
   showOnlineBadge = true,
   onOpenAdmin,
 }) => {
@@ -116,14 +116,14 @@ export const WystawkaDashboard: React.FC<WystawkaDashboardProps> = ({
   const isDark = false;
   const scrollRef = React.useRef<React.ElementRef<typeof ScrollView>>(null);
 
-  // Rotacja banerów na pulpicie mobilnym (co bannerIntervalSeconds)
+  // Rotacja banerów na pulpicie mobilnym (co 3 sekundy)
   const homeBanners = React.useMemo(() => resolveBannerImages('home', customBanners), [customBanners]);
   const [activeBannerIdx, setActiveBannerIdx] = React.useState(0);
   const [failedBannerIndices, setFailedBannerIndices] = React.useState<Record<number, boolean>>({});
 
   React.useEffect(() => {
     if (homeBanners.length <= 1) return;
-    const intervalMs = Math.max(1, bannerIntervalSeconds || 4) * 1000;
+    const intervalMs = Math.max(1, bannerIntervalSeconds || 3) * 1000;
     const timer = setInterval(() => {
       setActiveBannerIdx((prev) => (prev + 1) % homeBanners.length);
     }, intervalMs);

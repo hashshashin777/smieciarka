@@ -1622,7 +1622,7 @@ export default function App() {
               showAuthControls={adminSettings.accountsEnabled}
               adsEnabled={adminSettings.adsEnabled}
               customBanners={adminSettings.customBanners}
-              bannerIntervalSeconds={adminSettings.bannerIntervalSeconds || 4}
+              bannerIntervalSeconds={3}
               showOnlineBadge={adminSettings.useRealOnlineUsers !== false}
               onOpenAdmin={() => setIsAdminModalVisible(true)}
               onOpenLogin={adminSettings.accountsEnabled ? () => setIsLoginModalVisible(true) : undefined}
