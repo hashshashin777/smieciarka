@@ -475,139 +475,134 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
       <section style={{ width: '100%' } as any}>
         <View style={styles.heroSearchSection}>
           <View style={styles.heroSearchInner}>
-            {/* Lekki moduł Czyste Powietrze nad banerem (łagodny styl spójny ze statystykami ekologicznymi) */}
-            <View style={styles.heroAirBadge}>
-              {/* Ikona i miasto */}
-              <View style={styles.heroAirStatItem}>
-                <MaterialCommunityIcons name="weather-windy" size={15} color="#059669" />
+            {/* Połączony lekki moduł: Czyste Powietrze + Seria Aktywności nad banerem */}
+            <View style={styles.heroCombinedBadge}>
+              {/* Sekcja 1: Czyste Powietrze */}
+              <View style={styles.heroCombinedSection}>
+                <View style={styles.heroCombinedStatItem}>
+                  <MaterialCommunityIcons name="weather-windy" size={15} color="#059669" />
+                  <TouchableOpacity
+                    onPress={onOpenCityPicker}
+                    style={styles.heroCombinedCityBtn}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Zmień miasto dla jakości powietrza, aktualnie: ${cityLabel}`}
+                  >
+                    <Text style={styles.heroCombinedText}>
+                      Czyste powietrze: <Text style={styles.heroCombinedBold}>{cityLabel}</Text>
+                    </Text>
+                    <MaterialCommunityIcons name="chevron-down" size={13} color="#059669" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.heroCombinedDot} />
+
+                {/* Status jakości */}
+                <View style={styles.heroCombinedStatItem}>
+                  <View
+                    style={[
+                      styles.heroCombinedStatusDot,
+                      { backgroundColor: airData?.aqiColor || '#10B981' },
+                    ]}
+                  />
+                  <Text style={styles.heroCombinedText}>
+                    Jakość: <Text style={[styles.heroCombinedBold, { color: airData?.aqiColor || '#064E3B' }]}>{airData?.aqiLabel || 'Dobra'}</Text>
+                    {airData?.aqi !== undefined && (
+                      <Text style={styles.heroCombinedSubBold}> (AQI {airData.aqi})</Text>
+                    )}
+                  </Text>
+                </View>
+
+                <View style={styles.heroCombinedDot} />
+
+                {/* Pomiary pyłów PM2.5 i PM10 */}
+                <View style={styles.heroCombinedStatItem}>
+                  <Text style={styles.heroCombinedText}>
+                    PM2.5: <Text style={styles.heroCombinedBold}>{airData?.pm25 ?? 8.4} µg/m³</Text>
+                  </Text>
+                </View>
+
+                <View style={styles.heroCombinedDot} />
+
+                <View style={styles.heroCombinedStatItem}>
+                  <Text style={styles.heroCombinedText}>
+                    PM10: <Text style={styles.heroCombinedBold}>{airData?.pm10 ?? 12.1} µg/m³</Text>
+                  </Text>
+                </View>
+
+                {/* Przycisk odświeżenia powietrza */}
                 <TouchableOpacity
-                  onPress={onOpenCityPicker}
-                  style={styles.heroAirCityBtn}
+                  onPress={loadAirQuality}
+                  style={styles.heroCombinedRefreshBtn}
                   activeOpacity={0.7}
                   accessibilityRole="button"
-                  accessibilityLabel={`Zmień miasto dla jakości powietrza, aktualnie: ${cityLabel}`}
+                  accessibilityLabel="Odśwież dane jakości powietrza"
                 >
-                  <Text style={styles.heroAirStatText}>
-                    Czyste powietrze: <Text style={styles.heroAirStatBold}>{cityLabel}</Text>
-                  </Text>
-                  <MaterialCommunityIcons name="chevron-down" size={13} color="#059669" />
+                  {airLoading ? (
+                    <ActivityIndicator size="small" color="#059669" style={{ transform: [{ scale: 0.65 }] }} />
+                  ) : (
+                    <MaterialCommunityIcons name="refresh" size={13} color="#059669" />
+                  )}
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.heroAirDot} />
+              {/* Elegancki pionowy separator między modułem powietrza a serii */}
+              <View style={styles.heroCombinedDivider} />
 
-              {/* Status jakości */}
-              <View style={styles.heroAirStatItem}>
-                <View
-                  style={[
-                    styles.heroAirStatusDot,
-                    { backgroundColor: airData?.aqiColor || '#10B981' },
-                  ]}
-                />
-                <Text style={styles.heroAirStatText}>
-                  Jakość: <Text style={[styles.heroAirStatBold, { color: airData?.aqiColor || '#064E3B' }]}>{airData?.aqiLabel || 'Dobra'}</Text>
-                  {airData?.aqi !== undefined && (
-                    <Text style={styles.heroAirSubBold}> (AQI {airData.aqi})</Text>
-                  )}
-                </Text>
-              </View>
+              {/* Sekcja 2: Seria Dni z Rzędu i Kalendarz */}
+              <View style={styles.heroCombinedSection}>
+                <View style={styles.heroCombinedStatItem}>
+                  <MaterialCommunityIcons name="fire" size={16} color="#F59E0B" />
+                  <Text style={styles.heroCombinedText}>
+                    Seria: <Text style={styles.heroCombinedBold}>{streakDays} {streakDays === 1 ? 'dzień' : 'dni'} z rzędu</Text>
+                  </Text>
+                </View>
 
-              <View style={styles.heroAirDot} />
+                <View style={styles.heroCombinedDot} />
 
-              {/* Pomiary pyłów PM2.5 i PM10 */}
-              <View style={styles.heroAirStatItem}>
-                <Text style={styles.heroAirStatText}>
-                  PM2.5: <Text style={styles.heroAirStatBold}>{airData?.pm25 ?? 8.4} µg/m³</Text>
-                </Text>
-              </View>
+                {/* Dzisiejsza data */}
+                <View style={styles.heroCombinedStatItem}>
+                  <MaterialCommunityIcons name="calendar-today" size={13} color="#059669" />
+                  <Text style={styles.heroCombinedText}>{todayFormatted}</Text>
+                </View>
 
-              <View style={styles.heroAirDot} />
+                <View style={styles.heroCombinedDot} />
 
-              <View style={styles.heroAirStatItem}>
-                <Text style={styles.heroAirStatText}>
-                  PM10: <Text style={styles.heroAirStatBold}>{airData?.pm10 ?? 12.1} µg/m³</Text>
-                </Text>
-              </View>
-
-              {/* Przycisk odświeżenia */}
-              <TouchableOpacity
-                onPress={loadAirQuality}
-                style={styles.heroAirRefreshBtn}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Odśwież dane jakości powietrza"
-              >
-                {airLoading ? (
-                  <ActivityIndicator size="small" color="#059669" style={{ transform: [{ scale: 0.65 }] }} />
-                ) : (
-                  <MaterialCommunityIcons name="refresh" size={13} color="#059669" />
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {/* Lekki moduł Seria Aktywności pod modułem Czyste Powietrze */}
-            <View style={styles.heroStreakBadge}>
-              {/* Płomień i liczba dni z rzędu */}
-              <View style={styles.heroStreakStatItem}>
-                <MaterialCommunityIcons name="fire" size={17} color="#F59E0B" />
-                <Text style={styles.heroStreakText}>
-                  Seria: <Text style={styles.heroStreakBold}>{streakDays} {streakDays === 1 ? 'dzień' : 'dni'} z rzędu</Text>
-                </Text>
-              </View>
-
-              <View style={styles.heroAirDot} />
-
-              {/* Dzisiejsza data */}
-              <View style={styles.heroStreakStatItem}>
-                <MaterialCommunityIcons name="calendar-today" size={13} color="#059669" />
-                <Text style={styles.heroStreakText}>{todayFormatted}</Text>
-              </View>
-
-              <View style={styles.heroAirDot} />
-
-              {/* Tydzień kalendarzowy Pn-Nd w lekkim wydaniu */}
-              <View style={styles.heroStreakDaysRow}>
-                {calendarDays.map((day) => (
-                  <View key={day.label} style={styles.heroStreakDayPill}>
-                    <Text
-                      style={[
-                        styles.heroStreakDayLabel,
-                        day.isToday && styles.heroStreakDayLabelToday,
-                      ]}
-                    >
-                      {day.label}
-                    </Text>
-                    <View
-                      style={[
-                        styles.heroStreakDayCircle,
-                        day.isCompleted && !day.isToday && styles.heroStreakDayDone,
-                        day.isToday && styles.heroStreakDayToday,
-                        day.isFuture && styles.heroStreakDayFuture,
-                      ]}
-                    >
+                {/* Tydzień kalendarzowy Pn-Nd w lekkim, czystym wydaniu */}
+                <View style={styles.heroStreakDaysRow}>
+                  {calendarDays.map((day) => (
+                    <View key={day.label} style={styles.heroStreakDayPill}>
                       <Text
                         style={[
-                          styles.heroStreakDayNum,
-                          day.isCompleted && !day.isToday && styles.heroStreakDayNumDone,
-                          day.isToday && styles.heroStreakDayNumToday,
-                          day.isFuture && styles.heroStreakDayNumFuture,
+                          styles.heroStreakDayLabel,
+                          day.isToday && styles.heroStreakDayLabelToday,
                         ]}
                       >
-                        {day.dayNumber}
+                        {day.label}
                       </Text>
+                      <View
+                        style={[
+                          styles.heroStreakDayCircle,
+                          day.isCompleted && !day.isToday && styles.heroStreakDayDone,
+                          day.isToday && styles.heroStreakDayToday,
+                          day.isFuture && styles.heroStreakDayFuture,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.heroStreakDayNum,
+                            day.isCompleted && !day.isToday && styles.heroStreakDayNumDone,
+                            day.isToday && styles.heroStreakDayNumToday,
+                            day.isFuture && styles.heroStreakDayNumFuture,
+                          ]}
+                        >
+                          {day.dayNumber}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  ))}
+                </View>
               </View>
-
-              <View style={styles.heroAirDot} />
-
-              {/* Tekst motywacyjny */}
-              <Text style={styles.heroStreakMotivational}>
-                {streakDays >= 5
-                  ? 'Świetna regularność Zero-Waste!'
-                  : 'Wracaj codziennie po nowe wystawki'}
-              </Text>
             </View>
 
             {/* Panoramiczny Baner WWW (rotacja motywów z czasem z adminSettings, zoptymalizowany WebP, slot admina 'web') */}
@@ -1622,10 +1617,11 @@ const styles = StyleSheet.create({
     filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))' as any,
   },
   // Moduł czystego powietrza nad banerem w łagodnym stylu (heroAirBadge)
-  heroAirBadge: {
+  // Połączony moduł czystego powietrza i serii aktywności (heroCombinedBadge)
+  heroCombinedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 16,
     gap: 12,
     backgroundColor: '#F0FDF4',
     paddingVertical: 6,
@@ -1640,94 +1636,74 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 3,
   },
-  heroAirCityBtn: {
+  heroCombinedSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    cursor: 'pointer' as any,
+    gap: 9,
+    flexWrap: 'wrap',
   },
-  heroAirStatItem: {
+  heroCombinedDivider: {
+    width: 1,
+    height: 18,
+    backgroundColor: '#A7F3D0',
+    marginHorizontal: 3,
+  },
+  heroCombinedStatItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
   },
-  heroAirDot: {
+  heroCombinedDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
     backgroundColor: '#86EFAC',
   },
-  heroAirStatusDot: {
+  heroCombinedStatusDot: {
     width: 7,
     height: 7,
     borderRadius: 3.5,
   },
-  heroAirStatText: {
+  heroCombinedText: {
     color: '#047857',
-    fontSize: 13,
+    fontSize: 12.5,
   },
-  heroAirStatBold: {
+  heroCombinedBold: {
     fontWeight: '700',
     color: '#064E3B',
   },
-  heroAirSubBold: {
+  heroCombinedSubBold: {
     fontWeight: '600',
     color: '#047857',
-    fontSize: 12,
+    fontSize: 11.5,
   },
-  heroAirRefreshBtn: {
+  heroCombinedCityBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    cursor: 'pointer' as any,
+  },
+  heroCombinedRefreshBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 3,
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: 'rgba(5, 150, 105, 0.08)',
     marginLeft: 2,
     cursor: 'pointer' as any,
   },
-  // Lekki moduł serii dni pod modułem czystego powietrza (heroStreakBadge)
-  heroStreakBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
-    backgroundColor: '#F0FDF4',
-    paddingVertical: 5,
-    paddingHorizontal: 18,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#DCFCE7',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-  },
-  heroStreakStatItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  heroStreakText: {
-    color: '#047857',
-    fontSize: 13,
-  },
-  heroStreakBold: {
-    fontWeight: '700',
-    color: '#064E3B',
-  },
   heroStreakDaysRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   heroStreakDayPill: {
     alignItems: 'center',
     gap: 1,
   },
   heroStreakDayLabel: {
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '600',
     color: '#059669',
     textTransform: 'uppercase',
@@ -1737,9 +1713,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   heroStreakDayCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 19,
+    height: 19,
+    borderRadius: 9.5,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#DCFCE7',
@@ -1756,7 +1732,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(203, 213, 225, 0.4)',
   },
   heroStreakDayNum: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '700',
     color: '#064E3B',
   },
@@ -1770,11 +1746,6 @@ const styles = StyleSheet.create({
   heroStreakDayNumFuture: {
     color: '#94A3B8',
     fontWeight: '500',
-  },
-  heroStreakMotivational: {
-    fontSize: 12,
-    color: '#047857',
-    fontStyle: 'italic',
   },
   topNavActions: {
     flexDirection: 'row',
