@@ -283,10 +283,174 @@ DROP POLICY IF EXISTS "Public UPLOAD items-photos" ON storage.objects;
 CREATE POLICY "Public UPLOAD items-photos"
   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'items-photos');
 
-DROP POLICY IF EXISTS "Admin DELETE items-photos" ON storage.objects;
-CREATE POLICY "Admin DELETE items-photos"
-  ON storage.objects FOR DELETE
-  USING (
-    bucket_id = 'items-photos'
-    AND (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+-- 9. Tokeny gości oraz Zgłoszenia nadużyć (Item Reports)
+ALTER TABLE public.items
+  ADD COLUMN IF NOT EXISTS edit_token_hash TEXT;
+
+CREATE INDEX IF NOT EXISTS items_edit_token_hash_idx
+  ON public.items (edit_token_hash)
+  WHERE edit_token_hash IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION public.delete_guest_item(
+  p_item_id TEXT,
+  p_token TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_stored_hash TEXT;
+  v_computed_hash TEXT;
+BEGIN
+  IF p_item_id IS NULL OR p_token IS NULL OR length(trim(p_token)) < 16 THEN
+    RETURN FALSE;
+  END IF;
+
+  SELECT edit_token_hash INTO v_stored_hash
+  FROM public.items
+  WHERE id = p_item_id;
+
+  IF v_stored_hash IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  v_computed_hash := encode(sha256(trim(p_token)::bytea), 'hex');
+
+  IF v_stored_hash = v_computed_hash OR v_stored_hash = trim(p_token) THEN
+    DELETE FROM public.items WHERE id = p_item_id;
+    RETURN TRUE;
+  END IF;
+
+  RETURN FALSE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.archive_guest_item(
+  p_item_id TEXT,
+  p_token TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_stored_hash TEXT;
+  v_computed_hash TEXT;
+BEGIN
+  IF p_item_id IS NULL OR p_token IS NULL OR length(trim(p_token)) < 16 THEN
+    RETURN FALSE;
+  END IF;
+
+  SELECT edit_token_hash INTO v_stored_hash
+  FROM public.items
+  WHERE id = p_item_id;
+
+  IF v_stored_hash IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  v_computed_hash := encode(sha256(trim(p_token)::bytea), 'hex');
+
+  IF v_stored_hash = v_computed_hash OR v_stored_hash = trim(p_token) THEN
+    UPDATE public.items
+    SET status = 'taken'
+    WHERE id = p_item_id;
+    RETURN TRUE;
+  END IF;
+
+  RETURN FALSE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.verify_guest_item_token(
+  p_item_id TEXT,
+  p_token TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_stored_hash TEXT;
+  v_computed_hash TEXT;
+BEGIN
+  IF p_item_id IS NULL OR p_token IS NULL OR length(trim(p_token)) < 16 THEN
+    RETURN FALSE;
+  END IF;
+
+  SELECT edit_token_hash INTO v_stored_hash
+  FROM public.items
+  WHERE id = p_item_id;
+
+  IF v_stored_hash IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  v_computed_hash := encode(sha256(trim(p_token)::bytea), 'hex');
+
+  RETURN (v_stored_hash = v_computed_hash OR v_stored_hash = trim(p_token));
+END;
+$$;
+
+CREATE TABLE IF NOT EXISTS public.item_reports (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL REFERENCES public.items(id) ON DELETE CASCADE,
+  reporter_key TEXT NOT NULL,
+  reason TEXT NOT NULL CHECK (char_length(trim(reason)) BETWEEN 2 AND 500),
+  details TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'dismissed', 'action_taken')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  reviewed_at TIMESTAMPTZ,
+  reviewed_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS item_reports_item_idx ON public.item_reports (item_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS item_reports_status_idx ON public.item_reports (status, created_at DESC);
+
+ALTER TABLE public.item_reports ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Publiczne zgłaszanie naruszeń" ON public.item_reports;
+CREATE POLICY "Publiczne zgłaszanie naruszeń"
+  ON public.item_reports FOR INSERT
+  WITH CHECK (
+    char_length(trim(reason)) BETWEEN 2 AND 500
   );
+
+DROP POLICY IF EXISTS "Tylko admin odczytuje zgłoszenia" ON public.item_reports;
+CREATE POLICY "Tylko admin odczytuje zgłoszenia"
+  ON public.item_reports FOR SELECT
+  USING (
+    (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    OR EXISTS (SELECT 1 FROM public.admin_users WHERE admin_users.user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "Tylko admin aktualizuje zgłoszenia" ON public.item_reports;
+CREATE POLICY "Tylko admin aktualizuje zgłoszenia"
+  ON public.item_reports FOR UPDATE
+  USING (
+    (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    OR EXISTS (SELECT 1 FROM public.admin_users WHERE admin_users.user_id = auth.uid())
+  );
+
+CREATE OR REPLACE FUNCTION public.get_reported_items_summary()
+RETURNS TABLE (
+  item_id TEXT,
+  reports_count BIGINT,
+  latest_reason TEXT,
+  latest_report_date TIMESTAMPTZ
+)
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+  SELECT
+    r.item_id,
+    COUNT(r.id) AS reports_count,
+    (ARRAY_AGG(r.reason ORDER BY r.created_at DESC))[1] AS latest_reason,
+    MAX(r.created_at) AS latest_report_date
+  FROM public.item_reports r
+  WHERE r.status = 'pending'
+  GROUP BY r.item_id
+  ORDER BY reports_count DESC, latest_report_date DESC;
+$$;
+

@@ -13,6 +13,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import { APP_FONT } from '../constants/categories';
+import { useWebModalEscape } from '../hooks/useWebModalEscape';
 import {
   NeighborhoodSettings,
   NeighborhoodScope,
@@ -51,6 +52,8 @@ export const NeighborhoodModal: React.FC<NeighborhoodModalProps> = ({
   const [radius, setRadius] = React.useState(clampNeighborhoodRadius(settings.radiusKm));
   const [scope, setScope] = React.useState<NeighborhoodScope>(getNeighborhoodScope(settings));
   const [alerts, setAlerts] = React.useState(settings.alertsEnabled);
+
+  useWebModalEscape(visible, onClose);
 
   const syncFromSettings = React.useCallback(() => {
     setRadius(clampNeighborhoodRadius(settings.radiusKm));

@@ -19,6 +19,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { ItemCategory, ItemType, PostItem } from '../types';
 import { CATEGORIES, THEME } from '../constants/categories';
+import { useWebModalEscape } from '../hooks/useWebModalEscape';
+import { detectPiiInText } from '../utils/helpers';
 
 interface AddItemModalProps {
   visible: boolean;
@@ -49,6 +51,16 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Logistyka dla "Oddam za darmo"
+  const [floor, setFloor] = useState('');
+  const [hasElevator, setHasElevator] = useState(false);
+  const [requiresTransport, setRequiresTransport] = useState(false);
+  const [preferredHours, setPreferredHours] = useState('');
+
+  // Czas zauważenia dla "Wystawka uliczna"
+  const [spottedAt, setSpottedAt] = useState('Przed chwilą');
+  const [piiAcknowledged, setPiiAcknowledged] = useState(false);
+
   const resetForm = () => {
     setType('wystawka');
     setTitle('');
@@ -59,6 +71,12 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     setCoords(userCoords ? { latitude: userCoords.latitude, longitude: userCoords.longitude } : null);
     setIsLocating(false);
     setIsSubmitting(false);
+    setFloor('');
+    setHasElevator(false);
+    setRequiresTransport(false);
+    setPreferredHours('');
+    setSpottedAt('Przed chwilą');
+    setPiiAcknowledged(false);
   };
 
   const handleTakePhoto = async () => {
@@ -147,6 +165,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     onClose();
   };
 
+  useWebModalEscape(visible, handleClose);
+
   const handleSubmit = async () => {
     if (isSubmitting) return;
     if (!title.trim()) {
@@ -169,6 +189,31 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       return;
     }
 
+    if (!piiAcknowledged) {
+      const pii = detectPiiInText(`${title} ${description}`);
+      if (pii.detectedTypes.length > 0) {
+        Alert.alert(
+          'Ochrona prywatności ⚠️',
+          `W treści wykryto ${pii.detectedTypes.join(' oraz ')}. Ogłoszenie będzie widoczne publicznie w internecie. Zalecamy kontakt przez czat w aplikacji.\n\nCzy na pewno chcesz opublikować ogłoszenie z tymi danymi?`,
+          [
+            { text: 'Popraw opis', style: 'cancel' },
+            {
+              text: 'Opublikuj mimo to',
+              onPress: () => {
+                setPiiAcknowledged(true);
+                doSubmit(finalLat, finalLng);
+              },
+            },
+          ]
+        );
+        return;
+      }
+    }
+
+    doSubmit(finalLat, finalLng);
+  };
+
+  const doSubmit = async (finalLat: number, finalLng: number) => {
     setIsSubmitting(true);
 
     const newItem: PostItem = {
@@ -177,7 +222,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       title: title.trim(),
       description: description.trim() || (type === 'wystawka' ? 'Wystawione na ulicy do zabrania.' : 'Do odebrania za darmo.'),
       category,
-      photos: [photoUri],
+      photos: [photoUri!],
       location: {
         latitude: finalLat,
         longitude: finalLng,
@@ -193,6 +238,16 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       stillThereVotes: type === 'wystawka' ? 1 : 0,
       takenVotes: 0,
       authorName: 'Ty (Łowca Skarbów)',
+      pickupDetails:
+        type === 'oddam'
+          ? {
+              floor: floor.trim() ? parseInt(floor.trim(), 10) || 0 : undefined,
+              hasElevator,
+              requiresTransport,
+              preferredHours: preferredHours.trim() || undefined,
+            }
+          : undefined,
+      spottedAt: type === 'wystawka' ? spottedAt : undefined,
     };
 
     try {
@@ -370,6 +425,102 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                 onChangeText={setAddress}
               />
             </View>
+
+            {/* Specyficzne pola dla typu ogłoszenia (AUDIT-P1-04) */}
+            {type === 'oddam' ? (
+              <View style={styles.logisticsContainer}>
+                <Text style={styles.logisticsHeader}>📦 Warunki i logistyka odbioru</Text>
+
+                <View style={styles.logisticsRow}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={styles.subLabel}>Piętro</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="np. 2 (0 = parter)"
+                      placeholderTextColor="#94A3B8"
+                      value={floor}
+                      onChangeText={setFloor}
+                      keyboardType="numeric"
+                      maxLength={3}
+                    />
+                  </View>
+
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={styles.subLabel}>Czy jest winda?</Text>
+                    <TouchableOpacity
+                      style={[styles.toggleBtn, hasElevator && styles.toggleBtnActive]}
+                      onPress={() => setHasElevator(!hasElevator)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Winda dostępna"
+                    >
+                      <MaterialCommunityIcons
+                        name={hasElevator ? 'elevator-passenger' : 'elevator-passenger-outline'}
+                        size={18}
+                        color={hasElevator ? '#FFFFFF' : '#64748B'}
+                      />
+                      <Text style={[styles.toggleBtnText, hasElevator && styles.toggleBtnTextActive]}>
+                        {hasElevator ? 'Jest winda' : 'Brak windy'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.checkboxRow, requiresTransport && styles.checkboxRowActive]}
+                  onPress={() => setRequiresTransport(!requiresTransport)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: requiresTransport }}
+                >
+                  <MaterialCommunityIcons
+                    name={requiresTransport ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                    size={22}
+                    color={requiresTransport ? THEME.primary : '#64748B'}
+                  />
+                  <Text style={styles.checkboxLabel}>
+                    Gabaryt (wymaga kombi/busa lub pomocy 2 osób)
+                  </Text>
+                </TouchableOpacity>
+
+                <Text style={styles.subLabel}>Preferowane godziny odbioru</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="np. W tygodniu po 17:00, w weekendy dowolnie"
+                  placeholderTextColor="#94A3B8"
+                  value={preferredHours}
+                  onChangeText={setPreferredHours}
+                  maxLength={100}
+                />
+              </View>
+            ) : (
+              <View style={styles.wystawkaSpecificBox}>
+                <Text style={styles.subLabel}>Kiedy zauważono wystawkę?</Text>
+                <View style={styles.spottedRow}>
+                  {['Przed chwilą', '1-2 godz. temu', 'Dziś rano'].map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      style={[styles.spottedChip, spottedAt === opt && styles.spottedChipActive]}
+                      onPress={() => setSpottedAt(opt)}
+                    >
+                      <Text
+                        style={[
+                          styles.spottedChipText,
+                          spottedAt === opt && styles.spottedChipTextActive,
+                        ]}
+                      >
+                        {opt}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <View style={styles.wystawkaDisclaimer}>
+                  <MaterialCommunityIcons name="information" size={18} color="#D97706" />
+                  <Text style={styles.wystawkaDisclaimerText}>
+                    Wystawka uliczna znajduje się w przestrzeni publicznej. Zgłoszenie informuje sąsiadów — brak możliwości rezerwacji (kto pierwszy, ten lepszy).
+                  </Text>
+                </View>
+              </View>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -566,5 +717,118 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: THEME.primaryDark,
+  },
+  logisticsContainer: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+  },
+  logisticsHeader: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#065F46',
+    marginBottom: 8,
+  },
+  subLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
+    marginBottom: 4,
+    marginTop: 6,
+  },
+  logisticsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  toggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 48,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+  },
+  toggleBtnActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  toggleBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  toggleBtnTextActive: {
+    color: '#FFFFFF',
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  checkboxRowActive: {
+    opacity: 1,
+  },
+  checkboxLabel: {
+    fontSize: 13,
+    color: '#1E293B',
+    flex: 1,
+    fontWeight: '500',
+  },
+  wystawkaSpecificBox: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+  },
+  spottedRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  spottedChip: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+  },
+  spottedChipActive: {
+    backgroundColor: '#D97706',
+    borderColor: '#D97706',
+  },
+  spottedChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400E',
+  },
+  spottedChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  wystawkaDisclaimer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 4,
+  },
+  wystawkaDisclaimerText: {
+    fontSize: 12,
+    color: '#92400E',
+    lineHeight: 16,
+    flex: 1,
   },
 });

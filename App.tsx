@@ -76,12 +76,14 @@ import {
   CloudItemRow,
   mapCloudRowToPostItem,
   fetchItemsFromCloud,
+  fetchSingleItemFromCloud,
   insertItemToCloud,
   voteStillThereInCloud,
   voteTakenInCloud,
   restoreItemInCloud,
   archiveItemInCloud,
   deleteItemFromCloud,
+  reportItemInCloud,
   resetItemFlagsInCloud,
   updateItemInCloud,
   subscribeToOnlinePresence,
@@ -374,8 +376,78 @@ export default function App() {
       setDetailItem(found);
       setViewMode('list');
       setPendingDeepLinkItemId(null);
+      return;
     }
+
+    let isMounted = true;
+    const targetId = pendingDeepLinkItemId;
+
+    if (isSupabaseConfigured) {
+      fetchSingleItemFromCloud(targetId).then((res) => {
+        if (!isMounted) return;
+        if (res.ok && res.data) {
+          const cloudItem = res.data;
+          setItems((prev) => (prev.some((it) => it.id === cloudItem.id) ? prev : [cloudItem, ...prev]));
+          setDetailItem(cloudItem);
+          setViewMode('list');
+        } else {
+          Alert.alert(
+            'Ogłoszenie niedostępne 📦',
+            'To ogłoszenie mogło zostać usunięte przez autora lub wygasło z upływem czasu.',
+            [
+              { text: 'Zobacz ogłoszenia w okolicy', onPress: () => setViewMode('list') },
+            ]
+          );
+        }
+        setPendingDeepLinkItemId(null);
+      });
+    } else {
+      Alert.alert(
+        'Ogłoszenie niedostępne 📦',
+        'Nie znaleziono ogłoszenia o podanym identyfikatorze.',
+        [{ text: 'Wróć do listy', onPress: () => setViewMode('list') }]
+      );
+      setPendingDeepLinkItemId(null);
+    }
+
+    return () => {
+      isMounted = false;
+    };
   }, [items, pendingDeepLinkItemId]);
+
+  // Dynamiczne metatagi na Web (SEO / Social / Tytuł karty) - AUDIT-P2-04
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+
+    if (detailItem) {
+      const pageTitle = `${detailItem.title} – ${
+        detailItem.type === 'wystawka' ? 'Wystawka uliczna' : 'Oddam za darmo'
+      } | Wystawka Zero-Waste`;
+      document.title = pageTitle;
+
+      const setMetaTag = (property: string, content: string) => {
+        let el = document.querySelector(`meta[property="${property}"]`);
+        if (!el) {
+          el = document.createElement('meta');
+          el.setAttribute('property', property);
+          document.head.appendChild(el);
+        }
+        el.setAttribute('content', content);
+      };
+
+      setMetaTag('og:title', pageTitle);
+      setMetaTag(
+        'og:description',
+        detailItem.description ||
+          `Zobacz szczegóły i lokalizację: ${detailItem.title} (${detailItem.location.address || 'Polska'}). Ratuj rzeczy przed wyrzuceniem!`
+      );
+      if (detailItem.photos && detailItem.photos.length > 0) {
+        setMetaTag('og:image', detailItem.photos[0]);
+      }
+    } else {
+      document.title = 'Wystawka Zero-Waste – Darmowe rzeczy i wystawki w Twojej okolicy';
+    }
+  }, [detailItem]);
 
   const handleHardwareBack = useCallback((): boolean => {
     if (showWelcome) {
@@ -1178,6 +1250,21 @@ export default function App() {
       setSelectedMapItem(null);
     }
     deleteItemFromCloud(itemId);
+  };
+
+  const handleReportItem = async (item: PostItem, reason: string) => {
+    if (isSupabaseConfigured) {
+      const voterKey = await StorageCache.getVoterKey();
+      const res = await reportItemInCloud(item.id, reason, undefined, voterKey);
+      if (!res.ok) {
+        Alert.alert('Błąd zgłoszenia', res.error.message || 'Nie udało się zapisać zgłoszenia.');
+        return;
+      }
+    }
+    Alert.alert(
+      'Zgłoszenie przyjęte 🛡️',
+      'Dziękujemy za dbanie o naszą społeczność! Zgłoszenie zostało zarejestrowane i trafiło do panelu moderacji.'
+    );
   };
 
   const handleAdminDeleteBoardPost = (postId: string) => {
@@ -2060,6 +2147,9 @@ export default function App() {
           accountsEnabled={adminSettings.accountsEnabled}
           onOpenChat={() => handleOpenChat(detailItem)}
           onBlockAuthor={handleAdminToggleBlockAuthor}
+          onDeleteItem={handleAdminDeleteItem}
+          onArchiveItem={handleAdminArchiveItem}
+          onReportItem={handleReportItem}
         />
 
         <NeighborhoodModal

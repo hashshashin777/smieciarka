@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PostItem, UserProfile } from '../types';
+import { StorageCache } from '../services/storageCache';
+import { useWebModalEscape } from '../hooks/useWebModalEscape';
 import { THEME, CATEGORIES, APP_FONT } from '../constants/categories';
 import { calculateDistance, formatRelativeTime, openNavigation } from '../utils/helpers';
 
@@ -32,6 +34,8 @@ interface ItemDetailModalProps {
   onOpenChat?: () => void;
   onReportItem?: (item: PostItem, reason: string) => void;
   onBlockAuthor?: (authorName: string) => void;
+  onDeleteItem?: (itemId: string) => void | Promise<void>;
+  onArchiveItem?: (itemId: string) => void | Promise<void>;
 }
 
 export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
@@ -48,10 +52,37 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   onOpenChat,
   onReportItem,
   onBlockAuthor,
+  onDeleteItem,
+  onArchiveItem,
 }) => {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [isVoting, setIsVoting] = useState(false);
   const [failedPhotos, setFailedPhotos] = useState<Record<string, boolean>>({});
+  const [isOwner, setIsOwner] = useState(false);
+
+  useWebModalEscape(visible, onClose);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function checkOwnership() {
+      if (!item) {
+        if (isMounted) setIsOwner(false);
+        return;
+      }
+      if (currentUser?.id && item.userId && currentUser.id === item.userId) {
+        if (isMounted) setIsOwner(true);
+        return;
+      }
+      const guestToken = await StorageCache.getGuestItemToken(item.id);
+      if (isMounted) {
+        setIsOwner(Boolean(guestToken));
+      }
+    }
+    checkOwnership();
+    return () => {
+      isMounted = false;
+    };
+  }, [item, currentUser]);
 
   useEffect(() => {
     if (!visible) return;
@@ -326,6 +357,61 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </View>
             )}
 
+            {/* Specyficzne szczegóły odbioru dla "Oddam za darmo" (AUDIT-P1-04) */}
+            {!isWystawka && (item.pickupDetails || item.expiresAt) && (
+              <View style={styles.pickupDetailsCard}>
+                <View style={styles.pickupDetailsHeader}>
+                  <MaterialCommunityIcons name="truck-delivery-outline" size={18} color="#059669" />
+                  <Text style={styles.pickupDetailsTitle}>Logistyka odbioru</Text>
+                </View>
+
+                {item.pickupDetails?.floor !== undefined && (
+                  <View style={styles.pickupItemRow}>
+                    <Text style={styles.pickupItemLabel}>Piętro:</Text>
+                    <Text style={styles.pickupItemValue}>
+                      {item.pickupDetails.floor === 0 ? 'Parter' : `${item.pickupDetails.floor}. piętro`}
+                      {item.pickupDetails.hasElevator !== undefined && (
+                        ` (${item.pickupDetails.hasElevator ? 'jest winda' : 'brak windy'})`
+                      )}
+                    </Text>
+                  </View>
+                )}
+
+                {item.pickupDetails?.requiresTransport && (
+                  <View style={styles.pickupItemRow}>
+                    <Text style={styles.pickupItemLabel}>Gabaryt:</Text>
+                    <Text style={[styles.pickupItemValue, { color: '#B45309' }]}>
+                      Wymaga vana/kombi lub pomocy 2 osób
+                    </Text>
+                  </View>
+                )}
+
+                {Boolean(item.pickupDetails?.preferredHours) && (
+                  <View style={styles.pickupItemRow}>
+                    <Text style={styles.pickupItemLabel}>Godziny:</Text>
+                    <Text style={styles.pickupItemValue}>{item.pickupDetails?.preferredHours}</Text>
+                  </View>
+                )}
+
+                <View style={styles.pickupItemRow}>
+                  <Text style={styles.pickupItemLabel}>Ważność:</Text>
+                  <Text style={styles.pickupItemValue}>
+                    14 dni (do {new Date(item.expiresAt || nowMs + 14 * 86400000).toLocaleDateString('pl-PL')})
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Czas zauważenia dla wystawki */}
+            {isWystawka && Boolean(item.spottedAt) && (
+              <View style={styles.spottedInfoRow}>
+                <MaterialCommunityIcons name="eye-outline" size={16} color="#D97706" />
+                <Text style={styles.spottedInfoText}>
+                  Zauważono na ulicy: <Text style={{ fontWeight: '700' }}>{item.spottedAt}</Text>
+                </Text>
+              </View>
+            )}
+
             {/* Community status for Wystawka */}
             {isWystawka && (
               <View style={styles.wystawkaStatusBox}>
@@ -408,6 +494,77 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </View>
               <MaterialCommunityIcons name="chevron-right" size={20} color="#059669" />
             </TouchableOpacity>
+
+            {/* Zarządzanie przez autora (zalogowanego lub gościa z tokenem) */}
+            {isOwner && (
+              <View style={styles.ownerManageBox}>
+                <View style={styles.ownerManageHeader}>
+                  <MaterialCommunityIcons name="shield-account" size={20} color="#047857" />
+                  <Text style={styles.ownerManageTitle}>Twoje ogłoszenie</Text>
+                  <View style={styles.ownerBadge}>
+                    <Text style={styles.ownerBadgeText}>Autor</Text>
+                  </View>
+                </View>
+                <Text style={styles.ownerManageDesc}>
+                  Możesz oznaczyć ten przedmiot jako oddany lub bezpowrotnie usunąć ogłoszenie.
+                </Text>
+                <View style={styles.ownerActionRow}>
+                  {item.status === 'active' && onArchiveItem && (
+                    <TouchableOpacity
+                      style={styles.ownerArchiveBtn}
+                      onPress={() => {
+                        Alert.alert(
+                          'Oznacz jako oddany',
+                          'Czy ten przedmiot został już odebrany?',
+                          [
+                            { text: 'Anuluj', style: 'cancel' },
+                            {
+                              text: 'Tak, oznacz jako oddany',
+                              onPress: async () => {
+                                await onArchiveItem(item.id);
+                                onClose();
+                              },
+                            },
+                          ]
+                        );
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Oznacz ogłoszenie jako oddane"
+                    >
+                      <MaterialCommunityIcons name="check-circle-outline" size={16} color="#047857" />
+                      <Text style={styles.ownerArchiveBtnText}>Oznacz jako oddany</Text>
+                    </TouchableOpacity>
+                  )}
+                  {onDeleteItem && (
+                    <TouchableOpacity
+                      style={styles.ownerDeleteBtn}
+                      onPress={() => {
+                        Alert.alert(
+                          'Usuń ogłoszenie',
+                          'Czy na pewno chcesz bezpowrotnie usunąć to ogłoszenie z mapy?',
+                          [
+                            { text: 'Anuluj', style: 'cancel' },
+                            {
+                              text: 'Usuń',
+                              style: 'destructive',
+                              onPress: async () => {
+                                await onDeleteItem(item.id);
+                                onClose();
+                              },
+                            },
+                          ]
+                        );
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Usuń ogłoszenie"
+                    >
+                      <MaterialCommunityIcons name="trash-can-outline" size={16} color="#DC2626" />
+                      <Text style={styles.ownerDeleteBtnText}>Usuń</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )}
 
             {/* Action buttons (Nawiguj + Udostępnij) */}
             <View style={styles.actionContainer}>
@@ -580,6 +737,61 @@ const styles = StyleSheet.create({
   authorText: {
     fontSize: 13,
     color: THEME.textMuted,
+  },
+  pickupDetailsCard: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+  },
+  pickupDetailsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  pickupDetailsTitle: {
+    fontFamily: APP_FONT,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  pickupItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  pickupItemLabel: {
+    fontFamily: APP_FONT,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#047857',
+    width: 75,
+  },
+  pickupItemValue: {
+    fontFamily: APP_FONT,
+    fontSize: 12.5,
+    color: '#1E293B',
+    flex: 1,
+  },
+  spottedInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+  },
+  spottedInfoText: {
+    fontFamily: APP_FONT,
+    fontSize: 12.5,
+    color: '#92400E',
   },
   wystawkaStatusBox: {
     backgroundColor: '#FFFBEB',
@@ -755,5 +967,85 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontWeight: '600',
     textDecorationLine: 'underline',
+  },
+  ownerManageBox: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1.5,
+    borderColor: '#BBF7D0',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+  },
+  ownerManageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  ownerManageTitle: {
+    fontFamily: APP_FONT,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#065F46',
+    flex: 1,
+  },
+  ownerBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  ownerBadgeText: {
+    fontFamily: APP_FONT,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#047857',
+  },
+  ownerManageDesc: {
+    fontFamily: APP_FONT,
+    fontSize: 12,
+    color: '#065F46',
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  ownerActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  ownerArchiveBtn: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#059669',
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  ownerArchiveBtnText: {
+    fontFamily: APP_FONT,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#047857',
+  },
+  ownerDeleteBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  ownerDeleteBtnText: {
+    fontFamily: APP_FONT,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#DC2626',
   },
 });

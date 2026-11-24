@@ -3,8 +3,16 @@ import { Linking } from 'react-native';
 
 export function extractItemIdFromUrl(url: string | null): string | null {
   if (!url) return null;
-  const match = url.match(/(?:smieciarka:\/\/item\/|https?:\/\/[^/]+\/item\/)([^/?#]+)/i);
-  return match?.[1] ? decodeURIComponent(match[1]) : null;
+
+  // 1. Path format: smieciarka://item/:id or https://domain/item/:id
+  const pathMatch = url.match(/(?:smieciarka:\/\/item\/|https?:\/\/[^/]+\/item\/)([^/?#]+)/i);
+  if (pathMatch?.[1]) return decodeURIComponent(pathMatch[1]);
+
+  // 2. Query or hash param format: ?item=:id or ?itemId=:id or #item=:id
+  const paramMatch = url.match(/[?&#](?:item|itemId)=([^&#]+)/i);
+  if (paramMatch?.[1]) return decodeURIComponent(paramMatch[1]);
+
+  return null;
 }
 
 export function useDeepLinks(onOpenItemById: (itemId: string) => void): void {

@@ -20,6 +20,7 @@ import { APP_FONT } from '../constants/categories';
 import { CityOption, POLISH_CITIES, normalizePolishText } from '../constants/cities';
 import { PostItem } from '../types';
 import { calculateDistance } from '../utils/helpers';
+import { useWebModalEscape } from '../hooks/useWebModalEscape';
 
 interface CityPickerModalProps {
   visible: boolean;
@@ -41,6 +42,8 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
+
+  useWebModalEscape(visible, onClose);
 
   const popularCities = useMemo(
     () => POLISH_CITIES.filter((c) => c.isPopular),
@@ -110,12 +113,54 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
 
   const handleGeocodeCustomCity = async () => {
     if (!trimmedQuery) return;
+
     if (Platform.OS === 'web') {
-      Alert.alert(
-        'Wybierz miasto z listy',
-        'Wyszukiwanie dowolnej miejscowości spoza listy jest dostępne na urządzeniach mobilnych (Android / iOS).'
-      );
-      return;
+      setIsGeocoding(true);
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          trimmedQuery + ', Polska'
+        )}&countrycodes=pl&limit=1&addressdetails=1`;
+        const resp = await fetch(url, {
+          headers: {
+            'Accept-Language': 'pl',
+          },
+        });
+        if (!resp.ok) {
+          throw new Error('Geocoding network error');
+        }
+        const data = await resp.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const item = data[0];
+          const lat = parseFloat(item.lat);
+          const lng = parseFloat(item.lon);
+          const addr = item.address || {};
+          const resolvedName = addr.city || addr.town || addr.village || addr.municipality || trimmedQuery;
+          const resolvedVoivodeship = addr.state || 'Polska';
+          const customCity: CityOption = {
+            id: `custom_${Date.now()}`,
+            name: resolvedName,
+            voivodeship: resolvedVoivodeship,
+            latitude: lat,
+            longitude: lng,
+          };
+          handleChooseCity(customCity);
+          return;
+        } else {
+          Alert.alert(
+            'Nie znaleziono miejscowości',
+            `Nie udało się odnaleźć miejscowości „${trimmedQuery}”. Sprawdź pisownię lub wybierz miasto z listy.`
+          );
+          return;
+        }
+      } catch {
+        Alert.alert(
+          'Błąd wyszukiwania',
+          'Nie udało się połączyć z usługą mapy. Wybierz miejscowość z listy.'
+        );
+        return;
+      } finally {
+        setIsGeocoding(false);
+      }
     }
 
     setIsGeocoding(true);

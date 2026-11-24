@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import {
 } from '../types';
 import { CATEGORIES, APP_FONT } from '../constants/categories';
 import { formatRelativeTime } from '../utils/helpers';
+import { fetchReportedItemsSummaryInCloud } from '../services/supabase';
 
 type ModerationSubTab = 'items' | 'board' | 'blocked';
 type ItemStatusFilter = 'all' | 'active' | 'flagged' | 'expired' | 'archived';
@@ -101,6 +102,24 @@ export const AdminModerationTab: React.FC<AdminModerationTabProps> = ({
   const [boardAuthorDraft, setBoardAuthorDraft] = useState('');
   const [boardAreaDraft, setBoardAreaDraft] = useState('');
 
+  const [reportsMap, setReportsMap] = useState<Record<string, { count: number; latestReason: string }>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchReportedItemsSummaryInCloud().then((res) => {
+      if (isMounted && res.ok && res.data) {
+        const map: Record<string, { count: number; latestReason: string }> = {};
+        for (const r of res.data) {
+          map[r.itemId] = { count: r.reportsCount, latestReason: r.latestReason };
+        }
+        setReportsMap(map);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const blockedSet = useMemo(
     () => new Set(blockedAuthors.map((a) => a.toLowerCase())),
     [blockedAuthors]
@@ -116,9 +135,10 @@ export const AdminModerationTab: React.FC<AdminModerationTabProps> = ({
     let archived = 0;
     for (const item of items) {
       const isAct = isItemActiveCheck(item);
+      const isItemReported = Boolean(reportsMap[item.id]);
       if (isAct) {
         active += 1;
-        if (item.takenVotes > 0) flagged += 1;
+        if (item.takenVotes > 0 || isItemReported) flagged += 1;
       } else if (item.status === 'taken') {
         archived += 1;
       } else {
@@ -126,7 +146,7 @@ export const AdminModerationTab: React.FC<AdminModerationTabProps> = ({
       }
     }
     return { active, flagged, expired, archived };
-  }, [items, isItemActiveCheck]);
+  }, [items, isItemActiveCheck, reportsMap]);
 
   const categoryLabelMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -141,7 +161,7 @@ export const AdminModerationTab: React.FC<AdminModerationTabProps> = ({
     const list = items.filter((item) => {
       const isAct = isItemActiveCheck(item);
       if (statusFilter === 'active' && !isAct) return false;
-      if (statusFilter === 'flagged' && !(isAct && item.takenVotes > 0)) return false;
+      if (statusFilter === 'flagged' && !(isAct && (item.takenVotes > 0 || Boolean(reportsMap[item.id])))) return false;
       if (statusFilter === 'expired' && !(!isAct && item.status !== 'taken')) return false;
       if (statusFilter === 'archived' && !(!isAct && item.status === 'taken')) return false;
       if (typeFilter !== 'all' && item.type !== typeFilter) return false;
@@ -169,7 +189,7 @@ export const AdminModerationTab: React.FC<AdminModerationTabProps> = ({
       }
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
-  }, [items, statusFilter, typeFilter, categoryFilter, search, sortMode, isItemActiveCheck]);
+  }, [items, statusFilter, typeFilter, categoryFilter, search, sortMode, isItemActiveCheck, reportsMap]);
 
   const filteredBoardPosts = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -606,6 +626,14 @@ export const AdminModerationTab: React.FC<AdminModerationTabProps> = ({
                     {item.takenVotes > 0 && active && (
                       <View style={styles.flaggedTag}>
                         <Text style={styles.flaggedTagText}>⚠️ {item.takenVotes}/2</Text>
+                      </View>
+                    )}
+
+                    {Boolean(reportsMap[item.id]) && (
+                      <View style={styles.reportedTag}>
+                        <Text style={styles.reportedTagText}>
+                          🛡️ {reportsMap[item.id].count} zgł. ({reportsMap[item.id].latestReason})
+                        </Text>
                       </View>
                     )}
 
@@ -1340,6 +1368,20 @@ const styles = StyleSheet.create({
     fontFamily: APP_FONT,
     fontWeight: '700',
     color: '#DC2626',
+  },
+  reportedTag: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  reportedTagText: {
+    fontSize: 10,
+    fontFamily: APP_FONT,
+    fontWeight: '700',
+    color: '#B45309',
   },
   blockedTag: {
     backgroundColor: '#1E293B',

@@ -85,3 +85,29 @@ export async function openNavigation(
     Alert.alert('Brak aplikacji map', 'Nie udało się uruchomić nawigacji dla tych współrzędnych.');
   }
 }
+
+export interface PiiDetectionResult {
+  hasPhone: boolean;
+  hasEmail: boolean;
+  detectedTypes: string[];
+}
+
+/**
+ * Wykrywa obecność numeru telefonu lub adresu e-mail w tekście opisu (HIPOTEZA-03).
+ * Chroni użytkowników przed mimowolnym upublicznianiem danych osobowych.
+ */
+export function detectPiiInText(text: string): PiiDetectionResult {
+  if (!text) return { hasPhone: false, hasEmail: false, detectedTypes: [] };
+
+  const phoneRegex = /(?:\+48\s*)?(?:[1-9]\d{2}[-\s]?\d{3}[-\s]?\d{3}|[1-9]\d{1}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2})\b/;
+  const hasPhone = phoneRegex.test(text);
+
+  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
+  const hasEmail = emailRegex.test(text);
+
+  const detectedTypes: string[] = [];
+  if (hasPhone) detectedTypes.push('numer telefonu');
+  if (hasEmail) detectedTypes.push('adres e-mail');
+
+  return { hasPhone, hasEmail, detectedTypes };
+}

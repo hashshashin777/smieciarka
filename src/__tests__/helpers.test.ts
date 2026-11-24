@@ -1,4 +1,4 @@
-import { calculateDistance, formatRelativeTime } from '../utils/helpers';
+import { calculateDistance, formatRelativeTime, detectPiiInText } from '../utils/helpers';
 import { extractItemIdFromUrl } from '../hooks/useDeepLinks';
 
 describe('helpers utilities', () => {
@@ -50,8 +50,28 @@ describe('helpers utilities', () => {
     it('extracts item IDs from custom scheme and HTTPS universal links', () => {
       expect(extractItemIdFromUrl('smieciarka://item/post-123')).toBe('post-123');
       expect(extractItemIdFromUrl('https://smieciarka.fun/item/item%20abc?ref=share')).toBe('item abc');
+      expect(extractItemIdFromUrl('https://wystawka-app.vercel.app/?item=item-456')).toBe('item-456');
+      expect(extractItemIdFromUrl('https://wystawka-app.vercel.app/?itemId=item-789&source=share')).toBe('item-789');
       expect(extractItemIdFromUrl('https://smieciarka.fun/other/123')).toBeNull();
       expect(extractItemIdFromUrl(null)).toBeNull();
+    });
+  });
+
+  describe('detectPiiInText (HIPOTEZA-03)', () => {
+    it('detects 9-digit Polish phone numbers in various formats', () => {
+      expect(detectPiiInText('Zadzwoń pod 500-600-700 w sprawie odbioru').hasPhone).toBe(true);
+      expect(detectPiiInText('Mój nr: +48 601 234 567').hasPhone).toBe(true);
+      expect(detectPiiInText('Kontakt: 512345678').hasPhone).toBe(true);
+      expect(detectPiiInText('Stół drewniany, wysokość 75 cm, szerokość 120 cm').hasPhone).toBe(false);
+    });
+
+    it('detects email addresses', () => {
+      expect(detectPiiInText('Pisz na adres jan.kowalski@example.com').hasEmail).toBe(true);
+      expect(detectPiiInText('Oddam za darmo fotel PRL').hasEmail).toBe(false);
+    });
+
+    it('returns empty result for empty string', () => {
+      expect(detectPiiInText('').detectedTypes).toEqual([]);
     });
   });
 });
