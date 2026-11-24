@@ -874,43 +874,6 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
         </View>
       </section>
 
-      {/* 2.5 EDUKACJA: Czym różni się Wystawka od Oddam za darmo? (AUDIT-P3-01) */}
-      <section style={{ width: '100%', maxWidth: 1280, marginHorizontal: 'auto', paddingHorizontal: 20, marginTop: 14 } as any}>
-        <View style={styles.explainerCard}>
-          <View style={styles.explainerColWystawka}>
-            <View style={styles.explainerIconWrapWystawka}>
-              <MaterialCommunityIcons name="dump-truck" size={22} color="#D97706" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.explainerHeaderBadge}>
-                <Text style={styles.explainerTitleWystawka}>Wystawka uliczna</Text>
-                <View style={styles.wystawkaPill}><Text style={styles.wystawkaPillText}>Na ulicy / wiacie</Text></View>
-              </View>
-              <Text style={styles.explainerDesc}>
-                Rzeczy zauważone w przestrzeni publicznej. <Text style={{ fontWeight: '700' }}>Brak kontaktu z właścicielem i brak rezerwacji</Text> — podjeżdżasz i zabierasz prosto z chodnika (kto pierwszy, ten lepszy).
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.explainerDivider} />
-
-          <View style={styles.explainerColOddam}>
-            <View style={styles.explainerIconWrapOddam}>
-              <MaterialCommunityIcons name="gift-outline" size={22} color="#059669" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.explainerHeaderBadge}>
-                <Text style={styles.explainerTitleOddam}>Oddam za darmo</Text>
-                <View style={styles.oddamPill}><Text style={styles.oddamPillText}>Z rąk do rąk</Text></View>
-              </View>
-              <Text style={styles.explainerDesc}>
-                Przedmioty oddawane bezpośrednio przez sąsiadów z domu. <Text style={{ fontWeight: '700' }}>Odbiór osobisty</Text> — piszesz na czacie i bezpiecznie umawiasz termin spotkania.
-              </Text>
-            </View>
-          </View>
-        </View>
-      </section>
-
       {/* 3. KATEGORIE GŁÓWNE */}
       <section style={{ width: '100%' } as any}>
         <View style={styles.categoriesContainer}>
@@ -997,6 +960,43 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                   </TouchableOpacity>
                 );
               })}
+            </View>
+          </View>
+        </View>
+      </section>
+
+      {/* 3.5 EDUKACJA: Czym różni się Wystawka od Oddam za darmo? (AUDIT-P3-01) */}
+      <section style={{ width: '100%', maxWidth: 1280, marginHorizontal: 'auto', paddingHorizontal: 20, marginTop: 18, marginBottom: 2 } as any}>
+        <View style={styles.explainerCard}>
+          <View style={styles.explainerColWystawka}>
+            <View style={styles.explainerIconWrapWystawka}>
+              <MaterialCommunityIcons name="dump-truck" size={22} color="#D97706" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.explainerHeaderBadge}>
+                <Text style={styles.explainerTitleWystawka}>Wystawka uliczna</Text>
+                <View style={styles.wystawkaPill}><Text style={styles.wystawkaPillText}>Na ulicy / wiacie</Text></View>
+              </View>
+              <Text style={styles.explainerDesc}>
+                Rzeczy zauważone w przestrzeni publicznej. <Text style={{ fontWeight: '700' }}>Brak kontaktu z właścicielem i brak rezerwacji</Text> — podjeżdżasz i zabierasz prosto z chodnika (kto pierwszy, ten lepszy).
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.explainerDivider} />
+
+          <View style={styles.explainerColOddam}>
+            <View style={styles.explainerIconWrapOddam}>
+              <MaterialCommunityIcons name="gift-outline" size={22} color="#059669" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.explainerHeaderBadge}>
+                <Text style={styles.explainerTitleOddam}>Oddam za darmo</Text>
+                <View style={styles.oddamPill}><Text style={styles.oddamPillText}>Z rąk do rąk</Text></View>
+              </View>
+              <Text style={styles.explainerDesc}>
+                Przedmioty oddawane bezpośrednio przez sąsiadów z domu. <Text style={{ fontWeight: '700' }}>Odbiór osobisty</Text> — piszesz na czacie i bezpiecznie umawiasz termin spotkania.
+              </Text>
             </View>
           </View>
         </View>
@@ -1516,7 +1516,6 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                   style={{
                     width: 86,
                     height: 56,
-                    filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))' as any,
                   }}
                   resizeMode="contain"
                 />
@@ -1651,7 +1650,6 @@ const styles = StyleSheet.create({
   webLogoImage: {
     width: 108,
     height: 72,
-    filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))' as any,
   },
   // Moduł czystego powietrza nad banerem w łagodnym stylu (heroAirBadge)
   // Połączony moduł czystego powietrza i serii aktywności (heroCombinedBadge)
