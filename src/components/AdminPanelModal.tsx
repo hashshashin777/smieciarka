@@ -663,12 +663,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   <View style={[styles.switchRow, { borderBottomWidth: adminSettings.autoExpireEnabled ? 1 : 0, paddingBottom: adminSettings.autoExpireEnabled ? 12 : 0 }]}>
                     <View style={styles.flexOne}>
                       <Text style={styles.switchTitle}>
-                        Automatyczne wygasanie (TTL {adminSettings.autoExpireHours ?? 6}h)
+                        Automatyczne wygasanie (TTL)
                       </Text>
                       <Text style={styles.switchSub}>
                         {adminSettings.autoExpireEnabled
-                          ? `Ukrywa niepotwierdzone wystawki starsze niż ${adminSettings.autoExpireHours ?? 6} godz.`
-                          : 'Wyłączone – wystawki nie wygasają automatycznie'}
+                          ? `Wystawki: ${adminSettings.autoExpireHours ?? 6}h • Oddam: ${adminSettings.autoExpireOddamDays ?? 14} dni`
+                          : 'Wyłączone – ogłoszenia nie wygasają automatycznie'}
                       </Text>
                     </View>
                     <Switch
@@ -680,43 +680,83 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   </View>
 
                   {adminSettings.autoExpireEnabled && (
-                    <View style={styles.sliderSectionBox}>
-                      <View style={styles.sliderHeaderRow}>
-                        <Text style={styles.sliderLabelTitle}>Czas wygasania wystawek:</Text>
-                        <View style={styles.sliderBadge}>
-                          <MaterialCommunityIcons name="clock-outline" size={14} color="#059669" />
-                          <Text style={styles.sliderBadgeText}>
-                            {adminSettings.autoExpireHours ?? 6} {((adminSettings.autoExpireHours ?? 6) === 1) ? 'godzina' : ((adminSettings.autoExpireHours ?? 6) < 5) ? 'godziny' : 'godzin'}
-                          </Text>
+                    <>
+                      <View style={styles.sliderSectionBox}>
+                        <View style={styles.sliderHeaderRow}>
+                          <Text style={styles.sliderLabelTitle}>Czas wygasania wystawek:</Text>
+                          <View style={styles.sliderBadge}>
+                            <MaterialCommunityIcons name="clock-outline" size={14} color="#059669" />
+                            <Text style={styles.sliderBadgeText}>
+                              {adminSettings.autoExpireHours ?? 6} {((adminSettings.autoExpireHours ?? 6) === 1) ? 'godzina' : ((adminSettings.autoExpireHours ?? 6) < 5) ? 'godziny' : 'godzin'}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Slider
+                          style={styles.adminSlider}
+                          minimumValue={1}
+                          maximumValue={72}
+                          step={1}
+                          value={adminSettings.autoExpireHours ?? 6}
+                          onValueChange={(val) => {
+                            onUpdateAdminSettings({
+                              ...adminSettings,
+                              autoExpireHours: Math.round(val),
+                            });
+                          }}
+                          minimumTrackTintColor="#059669"
+                          maximumTrackTintColor="#CBD5E1"
+                          thumbTintColor="#059669"
+                        />
+
+                        <View style={styles.sliderTicksRow}>
+                          <Text style={styles.sliderTickText}>1h</Text>
+                          <Text style={styles.sliderTickText}>6h</Text>
+                          <Text style={styles.sliderTickText}>12h</Text>
+                          <Text style={styles.sliderTickText}>24h</Text>
+                          <Text style={styles.sliderTickText}>48h</Text>
+                          <Text style={styles.sliderTickText}>72h</Text>
                         </View>
                       </View>
 
-                      <Slider
-                        style={styles.adminSlider}
-                        minimumValue={1}
-                        maximumValue={72}
-                        step={1}
-                        value={adminSettings.autoExpireHours ?? 6}
-                        onValueChange={(val) => {
-                          onUpdateAdminSettings({
-                            ...adminSettings,
-                            autoExpireHours: Math.round(val),
-                          });
-                        }}
-                        minimumTrackTintColor="#059669"
-                        maximumTrackTintColor="#CBD5E1"
-                        thumbTintColor="#059669"
-                      />
+                      <View style={[styles.sliderSectionBox, { borderTopWidth: 1, borderTopColor: '#F1F5F9', marginTop: 14, paddingTop: 14 }]}>
+                        <View style={styles.sliderHeaderRow}>
+                          <Text style={styles.sliderLabelTitle}>Czas ważności „Oddam za darmo”:</Text>
+                          <View style={[styles.sliderBadge, { backgroundColor: '#FEF3C7' }]}>
+                            <MaterialCommunityIcons name="calendar-clock" size={14} color="#D97706" />
+                            <Text style={[styles.sliderBadgeText, { color: '#B45309' }]}>
+                              {adminSettings.autoExpireOddamDays ?? 14} {(adminSettings.autoExpireOddamDays ?? 14) === 1 ? 'dzień' : 'dni'}
+                            </Text>
+                          </View>
+                        </View>
 
-                      <View style={styles.sliderTicksRow}>
-                        <Text style={styles.sliderTickText}>1h</Text>
-                        <Text style={styles.sliderTickText}>6h</Text>
-                        <Text style={styles.sliderTickText}>12h</Text>
-                        <Text style={styles.sliderTickText}>24h</Text>
-                        <Text style={styles.sliderTickText}>48h</Text>
-                        <Text style={styles.sliderTickText}>72h</Text>
+                        <Slider
+                          style={styles.adminSlider}
+                          minimumValue={1}
+                          maximumValue={60}
+                          step={1}
+                          value={adminSettings.autoExpireOddamDays ?? 14}
+                          onValueChange={(val) => {
+                            onUpdateAdminSettings({
+                              ...adminSettings,
+                              autoExpireOddamDays: Math.round(val),
+                            });
+                          }}
+                          minimumTrackTintColor="#D97706"
+                          maximumTrackTintColor="#CBD5E1"
+                          thumbTintColor="#D97706"
+                        />
+
+                        <View style={styles.sliderTicksRow}>
+                          <Text style={styles.sliderTickText}>1d</Text>
+                          <Text style={styles.sliderTickText}>7d</Text>
+                          <Text style={styles.sliderTickText}>14d</Text>
+                          <Text style={styles.sliderTickText}>21d</Text>
+                          <Text style={styles.sliderTickText}>30d</Text>
+                          <Text style={styles.sliderTickText}>60d</Text>
+                        </View>
                       </View>
-                    </View>
+                    </>
                   )}
                 </View>
 

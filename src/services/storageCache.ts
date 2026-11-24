@@ -29,6 +29,7 @@ export interface AdminSettings {
   adsEnabled: boolean;
   autoExpireEnabled: boolean;
   autoExpireHours: number;
+  autoExpireOddamDays: number;
   bannerEnabled: boolean;
   bannerText: string;
   usersCount: number;
@@ -46,6 +47,7 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettings = {
   adsEnabled: true,
   autoExpireEnabled: true,
   autoExpireHours: 6,
+  autoExpireOddamDays: 14,
   bannerEnabled: true,
   bannerText: DEFAULT_BETA_BANNER_TEXT,
   usersCount: 1,
@@ -502,6 +504,12 @@ export const StorageCache = {
             typeof parsed.autoExpireHours === 'number' && parsed.autoExpireHours >= 1 && parsed.autoExpireHours <= 72
               ? Math.round(parsed.autoExpireHours)
               : DEFAULT_ADMIN_SETTINGS.autoExpireHours,
+          autoExpireOddamDays:
+            typeof parsed.autoExpireOddamDays === 'number' &&
+            parsed.autoExpireOddamDays >= 1 &&
+            parsed.autoExpireOddamDays <= 60
+              ? Math.round(parsed.autoExpireOddamDays)
+              : DEFAULT_ADMIN_SETTINGS.autoExpireOddamDays,
           bannerEnabled:
             typeof parsed.bannerEnabled === 'boolean'
               ? parsed.bannerEnabled

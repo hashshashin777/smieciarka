@@ -82,4 +82,24 @@ describe('StorageCache and neighborhood helpers', () => {
     await StorageCache.clearAllUserData();
     expect(await StorageCache.getPendingSyncQueue()).toEqual([]);
   });
+
+  it('handles AdminSettings with autoExpireOddamDays correctly', async () => {
+    const defaultSettings = await StorageCache.getAdminSettings();
+    expect(defaultSettings.autoExpireHours).toBe(6);
+    expect(defaultSettings.autoExpireOddamDays).toBe(14);
+    expect(defaultSettings.autoExpireEnabled).toBe(true);
+
+    await StorageCache.saveAdminSettings({
+      ...defaultSettings,
+      autoExpireOddamDays: 30,
+    });
+
+    const updated = await StorageCache.getAdminSettings();
+    expect(updated.autoExpireOddamDays).toBe(30);
+
+    // Test out of range fallback (min 1, max 60)
+    mockStore.set('smieciarka_admin_settings_v1', JSON.stringify({ autoExpireOddamDays: 999 }));
+    const clamped = await StorageCache.getAdminSettings();
+    expect(clamped.autoExpireOddamDays).toBe(14);
+  });
 });

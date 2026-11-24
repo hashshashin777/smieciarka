@@ -2,6 +2,16 @@ import { mapCloudRowToPostItem, CloudItemRow } from '../services/supabase';
 import { mapCloudRowToBoardPost, CloudBoardRow } from '../services/boardRepository';
 import { ok, fail } from '../types/result';
 
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: {
+    getItem: jest.fn(async () => null),
+    setItem: jest.fn(async () => undefined),
+    removeItem: jest.fn(async () => undefined),
+    multiRemove: jest.fn(async () => undefined),
+  },
+}));
+
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(async () => null),
   setItemAsync: jest.fn(async () => undefined),

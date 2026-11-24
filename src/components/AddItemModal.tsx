@@ -25,6 +25,8 @@ interface AddItemModalProps {
   onClose: () => void;
   onAddItem: (newItem: PostItem) => boolean | void | Promise<boolean | void>;
   userCoords?: { latitude: number; longitude: number } | null;
+  autoExpireHours?: number;
+  autoExpireOddamDays?: number;
 }
 
 export const AddItemModal: React.FC<AddItemModalProps> = ({
@@ -32,6 +34,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   onClose,
   onAddItem,
   userCoords,
+  autoExpireHours,
+  autoExpireOddamDays,
 }) => {
   const [type, setType] = useState<ItemType>('wystawka');
   const [title, setTitle] = useState('');
@@ -183,8 +187,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       createdAt: new Date().toISOString(),
       expiresAt:
         type === 'wystawka'
-          ? new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString()
-          : undefined,
+          ? new Date(Date.now() + (autoExpireHours ?? 6) * 60 * 60 * 1000).toISOString()
+          : new Date(Date.now() + (autoExpireOddamDays ?? 14) * 24 * 60 * 60 * 1000).toISOString(),
       status: 'active',
       stillThereVotes: type === 'wystawka' ? 1 : 0,
       takenVotes: 0,

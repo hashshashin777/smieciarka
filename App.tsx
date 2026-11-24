@@ -679,17 +679,30 @@ export default function App() {
   const effectiveUsersCount =
     adminSettings.useRealOnlineUsers !== false ? realOnlineCount : adminSettings.usersCount;
 
-  // Sprawdzanie czy wystawka wygasła (TTL ustalane przez admina, domyślnie 6 godzin)
+  // Sprawdzanie czy ogłoszenie wygasło (TTL ustalane przez admina, domyślnie wystawka: 6 godzin, oddam: 14 dni)
   const autoExpireHours = adminSettings.autoExpireHours ?? 6;
+  const autoExpireOddamDays = adminSettings.autoExpireOddamDays ?? 14;
   const isItemActive = (item: PostItem): boolean => {
     if (item.status !== 'active') return false;
-    if (adminSettings.autoExpireEnabled && item.type === 'wystawka') {
-      const ttlMs = autoExpireHours * 60 * 60 * 1000;
-      const expiry = item.expiresAt
-        ? new Date(item.expiresAt).getTime()
-        : new Date(item.createdAt).getTime() + ttlMs;
-      if (nowTimestamp > expiry) {
-        return false;
+    if (adminSettings.autoExpireEnabled) {
+      if (item.type === 'wystawka') {
+        const ttlMs = autoExpireHours * 60 * 60 * 1000;
+        const expiry = item.expiresAt
+          ? new Date(item.expiresAt).getTime()
+          : new Date(item.createdAt).getTime() + ttlMs;
+        if (nowTimestamp > expiry) {
+          return false;
+        }
+      } else if (item.type === 'oddam') {
+        const ttlMs = autoExpireOddamDays * 24 * 60 * 60 * 1000;
+        const createdExpiry = new Date(item.createdAt).getTime() + ttlMs;
+        const expiry =
+          item.expiresAt && new Date(item.expiresAt).getTime() > createdExpiry
+            ? new Date(item.expiresAt).getTime()
+            : createdExpiry;
+        if (nowTimestamp > expiry) {
+          return false;
+        }
       }
     }
     return true;
@@ -1109,19 +1122,22 @@ export default function App() {
 
   const handleAdminRestoreItem = (itemId: string) => {
     const hours = adminSettings.autoExpireHours ?? 6;
-    const newExpiry = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+    const days = adminSettings.autoExpireOddamDays ?? 14;
+    let detailExpiry = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
     setItems((prev) => {
-      const updated = prev.map((it) =>
-        it.id === itemId
-          ? { ...it, status: 'active' as const, takenVotes: 0, expiresAt: newExpiry }
-          : it
-      );
+      const updated = prev.map((it) => {
+        if (it.id !== itemId) return it;
+        const ttlMs = it.type === 'oddam' ? days * 24 * 60 * 60 * 1000 : hours * 60 * 60 * 1000;
+        const newExpiry = new Date(Date.now() + ttlMs).toISOString();
+        detailExpiry = newExpiry;
+        return { ...it, status: 'active' as const, takenVotes: 0, expiresAt: newExpiry };
+      });
       StorageCache.saveCachedItems(updated);
       return updated;
     });
     if (detailItem?.id === itemId) {
       setDetailItem((prev) =>
-        prev ? { ...prev, status: 'active', takenVotes: 0, expiresAt: newExpiry } : null
+        prev ? { ...prev, status: 'active', takenVotes: 0, expiresAt: detailExpiry } : null
       );
     }
     restoreItemInCloud(itemId);
@@ -1215,7 +1231,7 @@ export default function App() {
   ) => {
     const idSet = new Set(itemIds);
     const hours = adminSettings.autoExpireHours ?? 6;
-    const newExpiry = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+    const days = adminSettings.autoExpireOddamDays ?? 14;
     setItems((prev) => {
       const next =
         action === 'delete'
@@ -1223,6 +1239,8 @@ export default function App() {
           : prev.map((it) => {
               if (!idSet.has(it.id)) return it;
               if (action === 'restore') {
+                const ttlMs = it.type === 'oddam' ? days * 24 * 60 * 60 * 1000 : hours * 60 * 60 * 1000;
+                const newExpiry = new Date(Date.now() + ttlMs).toISOString();
                 return { ...it, status: 'active' as const, takenVotes: 0, expiresAt: newExpiry };
               }
               return { ...it, status: 'taken' as const };
@@ -1241,8 +1259,10 @@ export default function App() {
 
     if (detailItem && idSet.has(detailItem.id)) {
       if (action === 'restore') {
+        const ttlMs = detailItem.type === 'oddam' ? days * 24 * 60 * 60 * 1000 : hours * 60 * 60 * 1000;
+        const detailExpiry = new Date(Date.now() + ttlMs).toISOString();
         setDetailItem((prev) =>
-          prev ? { ...prev, status: 'active', takenVotes: 0, expiresAt: newExpiry } : null
+          prev ? { ...prev, status: 'active', takenVotes: 0, expiresAt: detailExpiry } : null
         );
       } else {
         setDetailItem(null);
@@ -2017,6 +2037,8 @@ export default function App() {
           onClose={() => setIsAddModalVisible(false)}
           onAddItem={handleAddItem}
           userCoords={gpsCoords}
+          autoExpireHours={adminSettings.autoExpireHours}
+          autoExpireOddamDays={adminSettings.autoExpireOddamDays}
         />
 
         <AddBoardPostModal
