@@ -17,7 +17,7 @@ import Slider from '@react-native-community/slider';
 import { PostItem, ItemType, BoardPost, UserProfile } from '../types';
 import { CATEGORIES } from '../constants/categories';
 import { CityOption, getCityDisplayLabel } from '../constants/cities';
-import { calculateDistance, formatRelativeTime, safeOpenUrl } from '../utils/helpers';
+import { calculateDistance, formatRelativeTime, safeOpenUrl, formatRemainingCountdown } from '../utils/helpers';
 import {
   EcoStats,
   AdminSettings,
@@ -35,6 +35,7 @@ import { resolveBannerImages } from '../constants/banners';
 import { fetchAirQuality, AirQualityData } from '../services/airQuality';
 import { getCalendarWeekDays } from './EcoImpactCard';
 import { WebLeafletMap } from './WebLeafletMap';
+import { DesktopChatView } from './DesktopChatView';
 
 
 
@@ -74,7 +75,7 @@ interface DesktopWebLayoutProps {
   onToggleAlerts?: () => void;
 }
 
-type DesktopTab = 'all' | 'wystawka' | 'oddam' | 'board' | 'map' | 'saved';
+type DesktopTab = 'all' | 'wystawka' | 'oddam' | 'board' | 'map' | 'saved' | 'chat';
 
 export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
   items,
@@ -391,6 +392,29 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                   ]}
                 >
                   Tablica sąsiedzka
+                </Text>
+              </TouchableOpacity>
+
+              {/* Czat */}
+              <TouchableOpacity
+                style={[styles.navLink, activeTab === 'chat' && styles.navLinkActive]}
+                onPress={() => handleTabChange('chat')}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Przejdź do czatu i wiadomości"
+              >
+                <MaterialCommunityIcons
+                  name="chat-processing-outline"
+                  size={20}
+                  color={activeTab === 'chat' ? '#102B25' : '#FFFFFF'}
+                />
+                <Text
+                  style={[
+                    styles.navLinkText,
+                    activeTab === 'chat' && styles.navLinkTextActive,
+                  ]}
+                >
+                  Czat
                 </Text>
               </TouchableOpacity>
 
@@ -1248,6 +1272,14 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                             <Text style={styles.mapSidebarItemAddress} numberOfLines={1}>
                               📍 {item.location.address || cityLabel}
                             </Text>
+                            {item.type === 'oddam' && (
+                              <View style={[styles.cardCountdownBadge, { marginTop: 4, marginBottom: 2 }]}>
+                                <MaterialCommunityIcons name="clock-outline" size={11} color="#047857" />
+                                <Text style={styles.cardCountdownText}>
+                                  {formatRemainingCountdown(item.expiresAt, item.createdAt, item.durationDays).shortFormatted}
+                                </Text>
+                              </View>
+                            )}
                           </View>
                         </TouchableOpacity>
                       ))}
@@ -1259,7 +1291,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
           )}
 
           {/* WIDOK: OGŁOSZENIA (WSZYSTKIE, WYSTAWKI, DO ODDANIA, ZAPISANE) */}
-          {activeTab !== 'board' && activeTab !== 'map' && (
+          {activeTab !== 'board' && activeTab !== 'map' && activeTab !== 'chat' && (
             <View style={styles.itemsSection}>
               <View style={styles.itemsSectionHeader}>
                 <View>
@@ -1377,6 +1409,16 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                               <Text style={styles.cardDistanceText}>📍 {distance}</Text>
                             )}
                           </View>
+
+                          {/* Licznik czasu ważności dla Oddam */}
+                          {item.type === 'oddam' && (
+                            <View style={styles.cardCountdownBadge}>
+                              <MaterialCommunityIcons name="clock-outline" size={12} color="#047857" />
+                              <Text style={styles.cardCountdownText}>
+                                Pozostało: {formatRemainingCountdown(item.expiresAt, item.createdAt, item.durationDays).formatted}
+                              </Text>
+                            </View>
+                          )}
 
                           {/* Lokalizacja i czas dodania */}
                           <View style={styles.cardLocationRow}>
@@ -1500,6 +1542,16 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 </View>
               )}
             </View>
+          )}
+
+          {/* WIDOK: CZAT I WIADOMOŚCI */}
+          {activeTab === 'chat' && (
+            <DesktopChatView
+              items={items}
+              currentUser={currentUser}
+              onOpenAuth={onOpenAuth}
+              onOpenDetail={onOpenDetail}
+            />
           )}
         </View>
       </main>
@@ -2840,6 +2892,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     fontWeight: '500',
+  },
+  cardCountdownBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  cardCountdownText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#065F46',
   },
   cardLocationRow: {
     flexDirection: 'row',

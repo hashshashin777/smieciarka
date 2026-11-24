@@ -1,4 +1,4 @@
-import { calculateDistance, formatRelativeTime, detectPiiInText } from '../utils/helpers';
+import { calculateDistance, formatRelativeTime, detectPiiInText, formatRemainingCountdown } from '../utils/helpers';
 import { extractItemIdFromUrl } from '../hooks/useDeepLinks';
 
 describe('helpers utilities', () => {
@@ -72,6 +72,65 @@ describe('helpers utilities', () => {
 
     it('returns empty result for empty string', () => {
       expect(detectPiiInText('').detectedTypes).toEqual([]);
+    });
+  });
+
+  describe('formatRemainingCountdown', () => {
+    it('correctly calculates remaining days, hours and minutes for 14-day duration', () => {
+      const now = 1_750_000_000_000;
+      // 14 days minus 10 minutes
+      const expiresAt = new Date(now + 14 * 24 * 60 * 60 * 1000 - 10 * 60 * 1000).toISOString();
+      const res = formatRemainingCountdown(expiresAt, undefined, undefined, now);
+
+      expect(res.isExpired).toBe(false);
+      expect(res.days).toBe(13);
+      expect(res.hours).toBe(23);
+      expect(res.minutes).toBe(50);
+      expect(res.formatted).toBe('13 dni 23 godz. 50 min');
+      expect(res.shortFormatted).toBe('13d 23h 50m');
+    });
+
+    it('formats single day as "dzień"', () => {
+      const now = 1_750_000_000_000;
+      const expiresAt = new Date(now + 1 * 24 * 60 * 60 * 1000 + 5 * 60 * 60 * 1000).toISOString();
+      const res = formatRemainingCountdown(expiresAt, undefined, undefined, now);
+
+      expect(res.isExpired).toBe(false);
+      expect(res.days).toBe(1);
+      expect(res.hours).toBe(5);
+      expect(res.formatted).toBe('1 dzień 5 godz. 0 min');
+    });
+
+    it('formats remaining hours and minutes when less than 24 hours remain', () => {
+      const now = 1_750_000_000_000;
+      const expiresAt = new Date(now + 4 * 60 * 60 * 1000 + 15 * 60 * 1000).toISOString();
+      const res = formatRemainingCountdown(expiresAt, undefined, undefined, now);
+
+      expect(res.days).toBe(0);
+      expect(res.hours).toBe(4);
+      expect(res.minutes).toBe(15);
+      expect(res.formatted).toBe('4 godz. 15 min');
+      expect(res.shortFormatted).toBe('4h 15m');
+    });
+
+    it('formats expired item correctly', () => {
+      const now = 1_750_000_000_000;
+      const expiresAt = new Date(now - 30 * 60 * 1000).toISOString();
+      const res = formatRemainingCountdown(expiresAt, undefined, undefined, now);
+
+      expect(res.isExpired).toBe(true);
+      expect(res.formatted).toBe('Wygasło (0 min)');
+      expect(res.shortFormatted).toBe('Wygasło');
+    });
+
+    it('calculates expiration from createdAt and durationDays fallback', () => {
+      const now = 1_750_000_000_000;
+      const createdAt = new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(); // created 2 days ago
+      const res = formatRemainingCountdown(undefined, createdAt, 7, now); // duration 7 days -> 5 days left
+
+      expect(res.isExpired).toBe(false);
+      expect(res.days).toBe(5);
+      expect(res.formatted).toBe('5 dni 0 godz. 0 min');
     });
   });
 });

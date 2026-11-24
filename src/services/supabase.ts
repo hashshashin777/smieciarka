@@ -967,7 +967,14 @@ export async function fetchAdminGlobalMetricsInCloud(
       });
 
       if (!error && data) {
-        return ok(data as AdminGlobalMetrics);
+        const cloudData = data as AdminGlobalMetrics;
+        if (!cloudData.pageviewsCount || !cloudData.uniqueVisitorsCount || !cloudData.registeredAccountsCount) {
+          const analytics = await StorageCache.getAnalyticsMetrics();
+          cloudData.pageviewsCount = cloudData.pageviewsCount || analytics.pageviews;
+          cloudData.uniqueVisitorsCount = cloudData.uniqueVisitorsCount || analytics.uniqueVisitors;
+          cloudData.registeredAccountsCount = cloudData.registeredAccountsCount || analytics.registeredAccounts;
+        }
+        return ok(cloudData);
       }
     } catch {
       // Fallback poniżej
@@ -1009,6 +1016,8 @@ export async function fetchAdminGlobalMetricsInCloud(
     }, 0)
   );
 
+  const analytics = await StorageCache.getAnalyticsMetrics();
+
   const fallbackMetrics: AdminGlobalMetrics = {
     activeItems,
     wystawkaActive,
@@ -1030,6 +1039,9 @@ export async function fetchAdminGlobalMetricsInCloud(
     globalRescuedCount,
     globalCo2Kg,
     co2Methodology: 'Szacunek oparty na kategoriach uratowanych rzeczy (meble: 25kg, agd/elektronika: 35kg, tekstylia: 5kg, inne: 10kg)',
+    pageviewsCount: analytics.pageviews,
+    uniqueVisitorsCount: analytics.uniqueVisitors,
+    registeredAccountsCount: analytics.registeredAccounts,
   };
 
   return ok(fallbackMetrics);

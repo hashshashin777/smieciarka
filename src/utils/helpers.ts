@@ -111,3 +111,111 @@ export function detectPiiInText(text: string): PiiDetectionResult {
 
   return { hasPhone, hasEmail, detectedTypes };
 }
+
+export interface CountdownResult {
+  formatted: string;
+  shortFormatted: string;
+  isExpired: boolean;
+  totalSeconds: number;
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+}
+
+/**
+ * Formatuje odliczanie czasu ważności ogłoszenia (np. dla "Oddam za darmo").
+ * Przelicza czas pozostały do wygaśnięcia z dokładnością do dni, godzin i minut.
+ */
+export function formatRemainingCountdown(
+  expiresAt?: string,
+  createdAt?: string,
+  durationDays?: number,
+  referenceNow = Date.now()
+): CountdownResult {
+  let targetMs = 0;
+
+  if (expiresAt) {
+    const parsed = new Date(expiresAt).getTime();
+    if (Number.isFinite(parsed)) {
+      targetMs = parsed;
+    }
+  }
+
+  if (targetMs === 0 && createdAt) {
+    const createdMs = new Date(createdAt).getTime();
+    if (Number.isFinite(createdMs)) {
+      const days = typeof durationDays === 'number' && durationDays > 0 ? durationDays : 14;
+      targetMs = createdMs + days * 24 * 60 * 60 * 1000;
+    }
+  }
+
+  if (targetMs === 0) {
+    return {
+      formatted: 'Brak terminu',
+      shortFormatted: 'Brak terminu',
+      isExpired: false,
+      totalSeconds: 0,
+      days: 0,
+      hours: 0,
+      minutes: 0,
+      seconds: 0,
+    };
+  }
+
+  const diffMs = targetMs - referenceNow;
+
+  if (diffMs <= 0) {
+    return {
+      formatted: 'Wygasło (0 min)',
+      shortFormatted: 'Wygasło',
+      isExpired: true,
+      totalSeconds: 0,
+      days: 0,
+      hours: 0,
+      minutes: 0,
+      seconds: 0,
+    };
+  }
+
+  const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
+  const seconds = totalSeconds % 60;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const minutes = totalMinutes % 60;
+  const totalHours = Math.floor(totalMinutes / 60);
+  const hours = totalHours % 24;
+  const days = Math.floor(totalHours / 24);
+
+  let formatted = '';
+  if (days > 0) {
+    const dayWord = days === 1 ? 'dzień' : 'dni';
+    formatted = `${days} ${dayWord} ${hours} godz. ${minutes} min`;
+  } else if (hours > 0) {
+    formatted = `${hours} godz. ${minutes} min`;
+  } else if (minutes > 0) {
+    formatted = `${minutes} min`;
+  } else {
+    formatted = `${seconds} sek`;
+  }
+
+  let shortFormatted = '';
+  if (days > 0) {
+    shortFormatted = `${days}d ${hours}h ${minutes}m`;
+  } else if (hours > 0) {
+    shortFormatted = `${hours}h ${minutes}m`;
+  } else {
+    shortFormatted = `${minutes}m`;
+  }
+
+  return {
+    formatted,
+    shortFormatted,
+    isExpired: false,
+    totalSeconds,
+    days,
+    hours,
+    minutes,
+    seconds,
+  };
+}
+

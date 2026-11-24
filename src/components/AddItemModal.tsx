@@ -61,6 +61,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   const [spottedAt, setSpottedAt] = useState('Przed chwilą');
   const [piiAcknowledged, setPiiAcknowledged] = useState(false);
 
+  // Ręczne ustawianie czasu trwania ogłoszenia
+  const [customDurationDays, setCustomDurationDays] = useState<number>(autoExpireOddamDays ?? 14);
+  const [customDurationHours, setCustomDurationHours] = useState<number>(autoExpireHours ?? 6);
+
   const resetForm = () => {
     setType('wystawka');
     setTitle('');
@@ -77,6 +81,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     setPreferredHours('');
     setSpottedAt('Przed chwilą');
     setPiiAcknowledged(false);
+    setCustomDurationDays(autoExpireOddamDays ?? 14);
+    setCustomDurationHours(autoExpireHours ?? 6);
   };
 
   const handleTakePhoto = async () => {
@@ -232,8 +238,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       createdAt: new Date().toISOString(),
       expiresAt:
         type === 'wystawka'
-          ? new Date(Date.now() + (autoExpireHours ?? 6) * 60 * 60 * 1000).toISOString()
-          : new Date(Date.now() + (autoExpireOddamDays ?? 14) * 24 * 60 * 60 * 1000).toISOString(),
+          ? new Date(Date.now() + (customDurationHours || 6) * 60 * 60 * 1000).toISOString()
+          : new Date(Date.now() + (customDurationDays || 14) * 24 * 60 * 60 * 1000).toISOString(),
+      durationDays: type === 'oddam' ? customDurationDays : undefined,
+      durationHours: type === 'wystawka' ? customDurationHours : undefined,
       status: 'active',
       stillThereVotes: type === 'wystawka' ? 1 : 0,
       takenVotes: 0,
@@ -521,6 +529,80 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                 </View>
               </View>
             )}
+
+            {/* Ręczny wybór czasu trwania ogłoszenia */}
+            <View style={styles.durationSection}>
+              <View style={styles.durationHeaderRow}>
+                <MaterialCommunityIcons
+                  name="timer-sand"
+                  size={18}
+                  color={type === 'oddam' ? THEME.oddam : THEME.wystawka}
+                />
+                <Text style={styles.durationHeaderTitle}>
+                  Czas trwania ogłoszenia: {type === 'oddam' ? `${customDurationDays} dni` : `${customDurationHours} godz.`}
+                </Text>
+              </View>
+              <Text style={styles.durationHint}>
+                {type === 'oddam'
+                  ? 'Wybierz, jak długo Twoje ogłoszenie ma być aktywne i widoczne dla sąsiadów (zegar odlicza czas do wygaśnięcia):'
+                  : 'Wystawki uliczne szybko znikają z chodników. Wybierz szacowany czas dostępności:'}
+              </Text>
+              <View style={styles.durationChipsRow}>
+                {type === 'oddam'
+                  ? [
+                      { label: '1 dzień', value: 1 },
+                      { label: '3 dni', value: 3 },
+                      { label: '7 dni', value: 7 },
+                      { label: '14 dni (zalecane)', value: 14 },
+                      { label: '30 dni', value: 30 },
+                    ].map((opt) => (
+                      <TouchableOpacity
+                        key={opt.value}
+                        style={[
+                          styles.durationChip,
+                          customDurationDays === opt.value && styles.durationChipActiveOddam,
+                        ]}
+                        onPress={() => setCustomDurationDays(opt.value)}
+                        activeOpacity={0.8}
+                      >
+                        <Text
+                          style={[
+                            styles.durationChipText,
+                            customDurationDays === opt.value && styles.durationChipTextActive,
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  : [
+                      { label: '2 godz.', value: 2 },
+                      { label: '4 godz.', value: 4 },
+                      { label: '6 godz. (zalecane)', value: 6 },
+                      { label: '12 godz.', value: 12 },
+                      { label: '24 godz.', value: 24 },
+                    ].map((opt) => (
+                      <TouchableOpacity
+                        key={opt.value}
+                        style={[
+                          styles.durationChip,
+                          customDurationHours === opt.value && styles.durationChipActiveWystawka,
+                        ]}
+                        onPress={() => setCustomDurationHours(opt.value)}
+                        activeOpacity={0.8}
+                      >
+                        <Text
+                          style={[
+                            styles.durationChipText,
+                            customDurationHours === opt.value && styles.durationChipTextActive,
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+              </View>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -830,5 +912,60 @@ const styles = StyleSheet.create({
     color: '#92400E',
     lineHeight: 16,
     flex: 1,
+  },
+  durationSection: {
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  durationHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  durationHeaderTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  durationHint: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 10,
+    lineHeight: 16,
+  },
+  durationChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  durationChip: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+  },
+  durationChipActiveOddam: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  durationChipActiveWystawka: {
+    backgroundColor: '#D97706',
+    borderColor: '#D97706',
+  },
+  durationChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  durationChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 });

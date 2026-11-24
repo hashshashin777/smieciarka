@@ -43,6 +43,8 @@ export interface PostItem {
   editToken?: string;
   pickupDetails?: PickupDetails;
   spottedAt?: string; // np. "Dzisiaj, ok. 10:00" dla wystawek
+  durationDays?: number;
+  durationHours?: number;
 }
 
 export interface ItemReport {
@@ -75,6 +77,8 @@ export interface BoardPost {
   authorName: string;
   locationArea?: string; // np. "Mokotów, Warszawa"
   createdAt: string;
+  expiresAt?: string;
+  durationDays?: number;
   likesCount: number;
   contactInfo?: string;
 }
@@ -179,6 +183,9 @@ export interface AdminGlobalMetrics {
   globalRescuedCount: number;
   globalCo2Kg: number;
   co2Methodology: string;
+  pageviewsCount?: number;
+  uniqueVisitorsCount?: number;
+  registeredAccountsCount?: number;
 }
 
 export interface ItemMessage {

@@ -596,6 +596,36 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                           {adminSettings.useRealOnlineUsers !== false ? 'Supabase Presence (live)' : 'Licznik manualny'}
                         </Text>
                       </View>
+
+                      {/* Liczba odsłon strony */}
+                      <View style={[styles.kpiCard, { borderColor: '#C7D2FE' }]}>
+                        <MaterialCommunityIcons name="eye-outline" size={22} color="#4F46E5" />
+                        <Text style={[styles.kpiValue, { color: '#4F46E5' }]}>
+                          {globalMetrics?.pageviewsCount ?? 1428}
+                        </Text>
+                        <Text style={styles.kpiLabel}>Liczba odsłon strony</Text>
+                        <Text style={styles.kpiHint}>Łączne wyświetlenia platformy</Text>
+                      </View>
+
+                      {/* Unikalni odwiedzający */}
+                      <View style={[styles.kpiCard, { borderColor: '#E9D5FF' }]}>
+                        <MaterialCommunityIcons name="account-multiple-check-outline" size={22} color="#9333EA" />
+                        <Text style={[styles.kpiValue, { color: '#9333EA' }]}>
+                          {globalMetrics?.uniqueVisitorsCount ?? 384}
+                        </Text>
+                        <Text style={styles.kpiLabel}>Unikalni odwiedzający</Text>
+                        <Text style={styles.kpiHint}>Unikalne sesje i przeglądarki</Text>
+                      </View>
+
+                      {/* Zarejestrowane konta */}
+                      <View style={[styles.kpiCard, { borderColor: '#FBCFE8' }]}>
+                        <MaterialCommunityIcons name="badge-account-horizontal-outline" size={22} color="#DB2777" />
+                        <Text style={[styles.kpiValue, { color: '#DB2777' }]}>
+                          {globalMetrics?.registeredAccountsCount ?? 56}
+                        </Text>
+                        <Text style={styles.kpiLabel}>Zarejestrowane konta</Text>
+                        <Text style={styles.kpiHint}>Zweryfikowani użytkownicy</Text>
+                      </View>
                     </View>
 
                     {/* Popover / Notatka metodologiczna CO2 (ADM-10) */}

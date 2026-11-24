@@ -529,6 +529,8 @@ export default function App() {
           StorageCache.getLikedBoardPostIds(),
         ]);
 
+        void StorageCache.recordPageview();
+
         const [
           nSettings,
           savedCity,

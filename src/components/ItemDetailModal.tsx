@@ -18,7 +18,7 @@ import { PostItem, UserProfile } from '../types';
 import { StorageCache } from '../services/storageCache';
 import { useWebModalEscape } from '../hooks/useWebModalEscape';
 import { THEME, CATEGORIES, APP_FONT } from '../constants/categories';
-import { calculateDistance, formatRelativeTime, openNavigation } from '../utils/helpers';
+import { calculateDistance, formatRelativeTime, openNavigation, formatRemainingCountdown } from '../utils/helpers';
 
 interface ItemDetailModalProps {
   item: PostItem | null;
@@ -98,6 +98,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
   const categoryMeta = CATEGORIES.find((c) => c.id === item.category) || CATEGORIES[CATEGORIES.length - 1];
   const isWystawka = item.type === 'wystawka';
+  const countdown = formatRemainingCountdown(item.expiresAt, item.createdAt, item.durationDays, nowMs);
   const distance = userCoords
     ? calculateDistance(userCoords.latitude, userCoords.longitude, item.location.latitude, item.location.longitude)
     : null;
@@ -326,6 +327,47 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             </View>
 
             <Text style={styles.title}>{item.title}</Text>
+
+            {/* Licznik czasu ważności dla "Oddam za darmo" */}
+            {!isWystawka && (
+              <View
+                style={[
+                  styles.countdownBox,
+                  countdown.isExpired
+                    ? styles.countdownBoxExpired
+                    : countdown.days === 0
+                    ? styles.countdownBoxUrgent
+                    : null,
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name={countdown.isExpired ? 'timer-off-outline' : 'clock-fast'}
+                  size={20}
+                  color={countdown.isExpired ? '#EF4444' : countdown.days === 0 ? '#D97706' : '#047857'}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[
+                      styles.countdownBoxTitle,
+                      countdown.isExpired
+                        ? styles.countdownBoxTitleExpired
+                        : countdown.days === 0
+                        ? styles.countdownBoxTitleUrgent
+                        : null,
+                    ]}
+                  >
+                    {countdown.isExpired
+                      ? 'Czas ważności ogłoszenia upłynął'
+                      : `Pozostały czas ważności: ${countdown.formatted}`}
+                  </Text>
+                  <Text style={styles.countdownBoxSub}>
+                    {countdown.isExpired
+                      ? 'To ogłoszenie wygasło. Autor lub moderator może je przedłużyć.'
+                      : 'Zegar odlicza czas do wygaśnięcia od momentu wystawienia ogłoszenia.'}
+                  </Text>
+                </View>
+              </View>
+            )}
 
             {/* Distance & Location bar */}
             <View style={styles.locationCard}>
@@ -1047,5 +1089,42 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#DC2626',
+  },
+  countdownBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  countdownBoxUrgent: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  countdownBoxExpired: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  countdownBoxTitle: {
+    fontFamily: APP_FONT,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  countdownBoxTitleUrgent: {
+    color: '#B45309',
+  },
+  countdownBoxTitleExpired: {
+    color: '#DC2626',
+  },
+  countdownBoxSub: {
+    fontFamily: APP_FONT,
+    fontSize: 12,
+    color: '#047857',
+    marginTop: 2,
   },
 });

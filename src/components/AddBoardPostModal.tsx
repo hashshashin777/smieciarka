@@ -34,6 +34,7 @@ export const AddBoardPostModal: React.FC<AddBoardPostModalProps> = ({
   const [authorName, setAuthorName] = useState('');
   const [locationArea, setLocationArea] = useState('');
   const [contactInfo, setContactInfo] = useState('');
+  const [durationDays, setDurationDays] = useState<number>(14);
 
   const resetForm = () => {
     setTag('szukam');
@@ -42,6 +43,7 @@ export const AddBoardPostModal: React.FC<AddBoardPostModalProps> = ({
     setAuthorName('');
     setLocationArea('');
     setContactInfo('');
+    setDurationDays(14);
   };
 
   const handleSubmit = () => {
@@ -54,6 +56,7 @@ export const AddBoardPostModal: React.FC<AddBoardPostModalProps> = ({
       return;
     }
 
+    const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
     const newPost: BoardPost = {
       id: `board-${Date.now()}`,
       title: title.trim(),
@@ -63,6 +66,8 @@ export const AddBoardPostModal: React.FC<AddBoardPostModalProps> = ({
       locationArea: locationArea.trim() || 'Lokalnie',
       contactInfo: contactInfo.trim() || undefined,
       createdAt: new Date().toISOString(),
+      expiresAt,
+      durationDays,
       likesCount: 1,
     };
 
@@ -178,6 +183,45 @@ export const AddBoardPostModal: React.FC<AddBoardPostModalProps> = ({
               value={contactInfo}
               onChangeText={setContactInfo}
             />
+
+            {/* Czas trwania ogłoszenia na tablicy */}
+            <View style={styles.durationSection}>
+              <View style={styles.durationHeaderRow}>
+                <MaterialCommunityIcons name="timer-sand" size={18} color="#059669" />
+                <Text style={styles.durationHeaderTitle}>Czas trwania ogłoszenia: {durationDays} dni</Text>
+              </View>
+              <Text style={styles.durationHint}>
+                Wybierz, przez jaki czas wpis ma być widoczny na tablicy sąsiedzkiej:
+              </Text>
+              <View style={styles.durationChipsRow}>
+                {[
+                  { label: '3 dni', value: 3 },
+                  { label: '7 dni', value: 7 },
+                  { label: '14 dni (standard)', value: 14 },
+                  { label: '30 dni', value: 30 },
+                  { label: '60 dni', value: 60 },
+                ].map((opt) => (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      styles.durationChip,
+                      durationDays === opt.value && styles.durationChipActive,
+                    ]}
+                    onPress={() => setDurationDays(opt.value)}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.durationChipText,
+                        durationDays === opt.value && styles.durationChipTextActive,
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -272,5 +316,56 @@ const styles = StyleSheet.create({
   textArea: {
     height: 100,
     textAlignVertical: 'top',
+  },
+  durationSection: {
+    marginTop: 18,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  durationHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  durationHeaderTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  durationHint: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 10,
+    lineHeight: 16,
+  },
+  durationChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  durationChip: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+  },
+  durationChipActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  durationChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  durationChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 });

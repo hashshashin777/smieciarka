@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { PostItem } from '../types';
 import { THEME, CATEGORIES, APP_FONT } from '../constants/categories';
 import { calculateDistance, formatRelativeTime } from '../utils/helpers';
+import { useCountdown } from '../hooks/useCountdown';
 
 interface ItemCardProps {
   item: PostItem;
@@ -29,6 +30,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     : null;
 
   const isWystawka = item.type === 'wystawka';
+  const countdown = useCountdown(item.expiresAt, item.createdAt, item.durationDays);
 
   return (
     <TouchableOpacity 
@@ -108,6 +110,39 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         <Text style={styles.description} numberOfLines={2}>
           {item.description}
         </Text>
+
+        {/* Odliczanie ważności dla "Oddam za darmo" */}
+        {!isWystawka && (
+          <View
+            style={[
+              styles.countdownBadge,
+              countdown.isExpired
+                ? styles.countdownBadgeExpired
+                : countdown.days === 0
+                ? styles.countdownBadgeUrgent
+                : null,
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={countdown.isExpired ? 'timer-off-outline' : 'clock-fast'}
+              size={13}
+              color={countdown.isExpired ? '#EF4444' : countdown.days === 0 ? '#D97706' : '#047857'}
+            />
+            <Text
+              style={[
+                styles.countdownText,
+                countdown.isExpired
+                  ? styles.countdownTextExpired
+                  : countdown.days === 0
+                  ? styles.countdownTextUrgent
+                  : null,
+              ]}
+              numberOfLines={1}
+            >
+              {countdown.isExpired ? 'Ogłoszenie wygasło' : `Ważne: ${countdown.formatted}`}
+            </Text>
+          </View>
+        )}
 
         {/* Meta row */}
         <View style={styles.metaRow}>
@@ -340,5 +375,38 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 12,
     color: THEME.textMuted,
+  },
+  countdownBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  countdownBadgeUrgent: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  countdownBadgeExpired: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  countdownText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#065F46',
+    fontFamily: APP_FONT,
+  },
+  countdownTextUrgent: {
+    color: '#B45309',
+  },
+  countdownTextExpired: {
+    color: '#DC2626',
   },
 });
