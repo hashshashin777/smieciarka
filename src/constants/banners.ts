@@ -1,6 +1,6 @@
 import { ImageSourcePropType } from 'react-native';
 
-export type BannerSlotId = 'home' | 'web' | 'map' | 'list' | 'board' | 'saved' | 'top_header';
+export type BannerSlotId = 'home' | 'web' | 'map' | 'list' | 'board' | 'saved';
 
 export type CustomBannerImages = Partial<Record<BannerSlotId, string | string[]>>;
 
@@ -72,13 +72,6 @@ export const BANNER_SLOTS: BannerSlotMeta[] = [
     locationHint: 'Góra ekranu w zakładce Zapisane',
     defaultLabel: 'Wypożyczalnia Smaku (GIF)',
     defaultSource: require('../assets/saved_ad_banner.gif'),
-  },
-  {
-    id: 'top_header',
-    label: 'Baner Górny – Nad Menu i Logo (Strona WWW)',
-    locationHint: 'Wyświetlany na samej górze strony WWW, bezpośrednio nad logo oraz panelem nawigacyjnym',
-    defaultLabel: 'Tu jest miejsce na Twoją reklamę (JPG)',
-    defaultSource: require('../assets/top_header_banner.jpg'),
   },
 ];
 
