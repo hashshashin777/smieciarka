@@ -18,6 +18,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 import { APP_FONT } from '../constants/categories';
+import { useWebModalEscape } from '../hooks/useWebModalEscape';
 import { AuthProvider, UserProfile } from '../types';
 import { AuthService } from '../services/authService';
 
@@ -70,6 +71,8 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  useWebModalEscape(visible, onClose);
 
   // Reset pól przy zamykaniu/przełączaniu
   const resetForm = () => {

@@ -17,6 +17,13 @@ export interface LocationCoords {
   isExact: boolean; // true dla wystawki (dokładny punkt na chodniku), false dla oddam (przybliżony obszar)
 }
 
+export interface PickupDetails {
+  floor?: number;
+  hasElevator?: boolean;
+  requiresTransport?: boolean;
+  preferredHours?: string;
+}
+
 export interface PostItem {
   id: string;
   type: ItemType; // 'wystawka' = znalezisko na ulicy, 'oddam' = z rąk do rąk
@@ -32,6 +39,20 @@ export interface PostItem {
   takenVotes: number; // głosy "Zabrane!"
   authorName?: string;
   contactInfo?: string;
+  userId?: string;
+  editToken?: string;
+  pickupDetails?: PickupDetails;
+  spottedAt?: string; // np. "Dzisiaj, ok. 10:00" dla wystawek
+}
+
+export interface ItemReport {
+  id: string;
+  itemId: string;
+  reporterKey: string;
+  reason: string;
+  details?: string;
+  status: 'pending' | 'reviewed' | 'dismissed' | 'action_taken';
+  createdAt: string;
 }
 
 export interface CategoryMeta {

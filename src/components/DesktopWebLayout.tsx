@@ -874,6 +874,43 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
         </View>
       </section>
 
+      {/* 2.5 EDUKACJA: Czym różni się Wystawka od Oddam za darmo? (AUDIT-P3-01) */}
+      <section style={{ width: '100%', maxWidth: 1280, marginHorizontal: 'auto', paddingHorizontal: 20, marginTop: 14 } as any}>
+        <View style={styles.explainerCard}>
+          <View style={styles.explainerColWystawka}>
+            <View style={styles.explainerIconWrapWystawka}>
+              <MaterialCommunityIcons name="dump-truck" size={22} color="#D97706" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.explainerHeaderBadge}>
+                <Text style={styles.explainerTitleWystawka}>Wystawka uliczna</Text>
+                <View style={styles.wystawkaPill}><Text style={styles.wystawkaPillText}>Na ulicy / wiacie</Text></View>
+              </View>
+              <Text style={styles.explainerDesc}>
+                Rzeczy zauważone w przestrzeni publicznej. <Text style={{ fontWeight: '700' }}>Brak kontaktu z właścicielem i brak rezerwacji</Text> — podjeżdżasz i zabierasz prosto z chodnika (kto pierwszy, ten lepszy).
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.explainerDivider} />
+
+          <View style={styles.explainerColOddam}>
+            <View style={styles.explainerIconWrapOddam}>
+              <MaterialCommunityIcons name="gift-outline" size={22} color="#059669" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.explainerHeaderBadge}>
+                <Text style={styles.explainerTitleOddam}>Oddam za darmo</Text>
+                <View style={styles.oddamPill}><Text style={styles.oddamPillText}>Z rąk do rąk</Text></View>
+              </View>
+              <Text style={styles.explainerDesc}>
+                Przedmioty oddawane bezpośrednio przez sąsiadów z domu. <Text style={{ fontWeight: '700' }}>Odbiór osobisty</Text> — piszesz na czacie i bezpiecznie umawiasz termin spotkania.
+              </Text>
+            </View>
+          </View>
+        </View>
+      </section>
+
       {/* 3. KATEGORIE GŁÓWNE */}
       <section style={{ width: '100%' } as any}>
         <View style={styles.categoriesContainer}>
@@ -2175,7 +2212,6 @@ const styles = StyleSheet.create({
     height: 48,
     fontSize: 15,
     color: '#0F172A',
-    outlineWidth: 0 as any,
   },
   clearSearchBtn: {
     padding: 6,
@@ -2457,6 +2493,99 @@ const styles = StyleSheet.create({
   },
 
   // 3. CATEGORIES SECTION
+  explainerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+    gap: 16,
+  },
+  explainerColWystawka: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  explainerColOddam: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  explainerIconWrapWystawka: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  explainerIconWrapOddam: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  explainerHeaderBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  explainerTitleWystawka: {
+    fontSize: 14.5,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  explainerTitleOddam: {
+    fontSize: 14.5,
+    fontWeight: '800',
+    color: '#065F46',
+  },
+  wystawkaPill: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  wystawkaPillText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  oddamPill: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  oddamPillText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#047857',
+  },
+  explainerDesc: {
+    fontSize: 12.5,
+    color: '#475569',
+    lineHeight: 18,
+  },
+  explainerDivider: {
+    width: 1,
+    height: '80%',
+    backgroundColor: '#E2E8F0',
+  },
   categoriesContainer: {
     width: '100%',
     backgroundColor: '#FFFFFF',

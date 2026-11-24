@@ -3,6 +3,8 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
+import * as Crypto from 'expo-crypto';
+import { StorageCache } from './storageCache';
 import { PostItem } from '../types';
 import { AppResult, fail, ok } from '../types/result';
 import { STRINGS_PL } from '../i18n/pl';
@@ -112,6 +114,7 @@ export interface CloudItemRow {
   taken_votes?: number | null;
   author_name?: string | null;
   contact_info?: string | null;
+  user_id?: string | null;
 }
 
 export function mapCloudRowToPostItem(row: CloudItemRow): PostItem {
@@ -135,6 +138,7 @@ export function mapCloudRowToPostItem(row: CloudItemRow): PostItem {
     takenVotes: row.taken_votes ?? 0,
     authorName: row.author_name || undefined,
     contactInfo: row.contact_info || undefined,
+    userId: row.user_id || undefined,
   };
 }
 
@@ -154,7 +158,58 @@ export async function fetchItemsFromCloud(): Promise<AppResult<PostItem[]>> {
   return ok((data || []).map((row) => mapCloudRowToPostItem(row as CloudItemRow)));
 }
 
-const UPLOADABLE_URI_SCHEMES = ['file://', 'content://', 'ph://', 'assets-library://'];
+export async function fetchSingleItemFromCloud(itemId: string): Promise<AppResult<PostItem | null>> {
+  if (!supabase) return fail('NOT_CONFIGURED', 'Supabase nie jest skonfigurowany.');
+
+  const { data, error } = await supabase
+    .from('items')
+    .select('*')
+    .eq('id', itemId)
+    .maybeSingle();
+
+  if (error) {
+    return fail('NETWORK', STRINGS_PL.errors.network, error);
+  }
+
+  if (!data) {
+    return ok(null);
+  }
+
+  return ok(mapCloudRowToPostItem(data as CloudItemRow));
+}
+
+export const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MB
+
+const UPLOADABLE_URI_SCHEMES = [
+  'file://',
+  'content://',
+  'ph://',
+  'assets-library://',
+  'blob:',
+  'data:image/',
+];
+
+export function isUploadableUri(uri: string): boolean {
+  if (!uri) return false;
+  if (uri.startsWith('http://') || uri.startsWith('https://')) return true;
+  return UPLOADABLE_URI_SCHEMES.some((prefix) => uri.startsWith(prefix));
+}
+
+export function resolvePhotoContentTypeAndExt(
+  uri: string,
+  headerContentType?: string | null
+): { contentType: 'image/jpeg' | 'image/png' | 'image/webp'; safeExt: 'jpg' | 'png' | 'webp' } {
+  const mime = (headerContentType || '').toLowerCase().trim();
+  const lowerUri = uri.toLowerCase();
+
+  if (mime.includes('png') || lowerUri.includes('.png') || lowerUri.startsWith('data:image/png')) {
+    return { contentType: 'image/png', safeExt: 'png' };
+  }
+  if (mime.includes('webp') || lowerUri.includes('.webp') || lowerUri.startsWith('data:image/webp')) {
+    return { contentType: 'image/webp', safeExt: 'webp' };
+  }
+  return { contentType: 'image/jpeg', safeExt: 'jpg' };
+}
 
 export async function uploadPhotoToStorage(
   localUri: string,
@@ -169,27 +224,36 @@ export async function uploadPhotoToStorage(
   if (localUri.startsWith('http://') || localUri.startsWith('https://')) {
     return ok(localUri);
   }
-  if (!UPLOADABLE_URI_SCHEMES.some((prefix) => localUri.startsWith(prefix))) {
+  if (!isUploadableUri(localUri)) {
     return fail('VALIDATION', `Nieobsługiwany format ścieżki zdjęcia: ${localUri}`);
   }
 
   try {
-    const ext = localUri.split('.').pop()?.toLowerCase();
-    const safeExt = ext === 'png' || ext === 'webp' ? ext : 'jpg';
     const sanitizedFolder = folder.replace(/[^a-zA-Z0-9_-]/g, '');
-    const filePath = `${sanitizedFolder}/img_${Date.now()}_${Math.random().toString(36).slice(2, 9)}.${safeExt}`;
 
     const response = await fetch(localUri);
     if (!response.ok) {
       return fail('UPLOAD', STRINGS_PL.errors.uploadFailed, response.status);
     }
+
     const arrayBuffer = await response.arrayBuffer();
     if (!arrayBuffer || arrayBuffer.byteLength === 0) {
       return fail('UPLOAD', STRINGS_PL.errors.uploadFailed);
     }
 
+    if (arrayBuffer.byteLength > MAX_PHOTO_BYTES) {
+      return fail('VALIDATION', 'Zdjęcie przekracza maksymalny dopuszczalny rozmiar (5 MB).');
+    }
+
+    const { contentType, safeExt } = resolvePhotoContentTypeAndExt(
+      localUri,
+      response.headers.get('content-type')
+    );
+
+    const filePath = `${sanitizedFolder}/img_${Date.now()}_${Math.random().toString(36).slice(2, 9)}.${safeExt}`;
+
     const { error } = await supabase.storage.from('items-photos').upload(filePath, arrayBuffer, {
-      contentType: `image/${safeExt === 'png' ? 'png' : safeExt === 'webp' ? 'webp' : 'jpeg'}`,
+      contentType,
       upsert: false,
     });
 
@@ -234,6 +298,23 @@ export async function insertItemToCloud(item: PostItem): Promise<AppResult<PostI
     currentUserId = null;
   }
 
+  let guestToken: string | null = null;
+  let editTokenHash: string | null = null;
+
+  if (!currentUserId) {
+    guestToken =
+      item.editToken ||
+      `gt_${Date.now()}_${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 10)}`;
+    try {
+      editTokenHash = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        guestToken
+      );
+    } catch {
+      editTokenHash = guestToken;
+    }
+  }
+
   const { error } = await supabase.from('items').insert({
     id: item.id,
     type: item.type,
@@ -252,6 +333,7 @@ export async function insertItemToCloud(item: PostItem): Promise<AppResult<PostI
     contact_info: item.contactInfo || null,
     expires_at: item.expiresAt || null,
     user_id: currentUserId,
+    edit_token_hash: editTokenHash,
     created_at: item.createdAt,
   });
 
@@ -259,9 +341,15 @@ export async function insertItemToCloud(item: PostItem): Promise<AppResult<PostI
     return fail('NETWORK', STRINGS_PL.errors.network, error);
   }
 
+  if (guestToken) {
+    await StorageCache.saveGuestItemToken(item.id, guestToken);
+  }
+
   return ok({
     ...item,
     photos: uploadedPhotos,
+    userId: currentUserId || undefined,
+    editToken: guestToken || undefined,
   });
 }
 
@@ -388,18 +476,95 @@ export async function restoreItemInCloud(itemId: string): Promise<AppResult<void
   return ok(undefined);
 }
 
-export async function archiveItemInCloud(itemId: string): Promise<AppResult<void>> {
+export async function archiveItemInCloud(
+  itemId: string,
+  guestToken?: string | null
+): Promise<AppResult<void>> {
   if (!supabase) return fail('NOT_CONFIGURED', 'Brak konfiguracji Supabase.');
-  const { error } = await supabase.from('items').update({ status: 'expired' }).eq('id', itemId);
+
+  const token = guestToken || (await StorageCache.getGuestItemToken(itemId));
+  if (token) {
+    const { data: rpcSuccess, error: rpcError } = await supabase.rpc('archive_guest_item', {
+      p_item_id: itemId,
+      p_token: token,
+    });
+    if (!rpcError && rpcSuccess) {
+      return ok(undefined);
+    }
+  }
+
+  const { error } = await supabase.from('items').update({ status: 'taken' }).eq('id', itemId);
   if (error) return fail('NETWORK', STRINGS_PL.errors.network, error);
   return ok(undefined);
 }
 
-export async function deleteItemFromCloud(itemId: string): Promise<AppResult<void>> {
+export async function deleteItemFromCloud(
+  itemId: string,
+  guestToken?: string | null
+): Promise<AppResult<void>> {
   if (!supabase) return fail('NOT_CONFIGURED', 'Brak konfiguracji Supabase.');
+
+  const token = guestToken || (await StorageCache.getGuestItemToken(itemId));
+  if (token) {
+    const { data: rpcSuccess, error: rpcError } = await supabase.rpc('delete_guest_item', {
+      p_item_id: itemId,
+      p_token: token,
+    });
+    if (!rpcError && rpcSuccess) {
+      await StorageCache.removeGuestItemToken(itemId);
+      return ok(undefined);
+    }
+  }
+
   const { error } = await supabase.from('items').delete().eq('id', itemId);
   if (error) return fail('NETWORK', STRINGS_PL.errors.network, error);
+  await StorageCache.removeGuestItemToken(itemId);
   return ok(undefined);
+}
+
+export async function reportItemInCloud(
+  itemId: string,
+  reason: string,
+  details?: string,
+  reporterKey = 'anon-device'
+): Promise<AppResult<void>> {
+  if (!supabase) return fail('NOT_CONFIGURED', 'Brak konfiguracji Supabase.');
+
+  const reportId = `rep_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const { error } = await supabase.from('item_reports').insert({
+    id: reportId,
+    item_id: itemId,
+    reporter_key: reporterKey,
+    reason: reason.trim().slice(0, 500),
+    details: details ? details.trim().slice(0, 1000) : null,
+    status: 'pending',
+  });
+
+  if (error) {
+    return fail('NETWORK', 'Nie udało się zapisać zgłoszenia w chmurze.', error);
+  }
+
+  return ok(undefined);
+}
+
+export async function fetchReportedItemsSummaryInCloud(): Promise<
+  AppResult<{ itemId: string; reportsCount: number; latestReason: string; latestReportDate: string }[]>
+> {
+  if (!supabase) return fail('NOT_CONFIGURED', 'Brak konfiguracji Supabase.');
+
+  const { data, error } = await supabase.rpc('get_reported_items_summary');
+  if (error) {
+    return fail('NETWORK', 'Nie udało się pobrać listy zgłoszeń.', error);
+  }
+
+  const summary = (data || []).map((row: any) => ({
+    itemId: row.item_id,
+    reportsCount: Number(row.reports_count || 0),
+    latestReason: String(row.latest_reason || ''),
+    latestReportDate: String(row.latest_report_date || ''),
+  }));
+
+  return ok(summary);
 }
 
 export async function resetItemFlagsInCloud(itemId: string): Promise<AppResult<void>> {

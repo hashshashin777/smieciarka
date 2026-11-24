@@ -22,6 +22,7 @@ const KEYS = {
   TUTORIAL_DONE: 'smieciarka_tutorial_done_v1',
   SELECTED_CITY: 'smieciarka_selected_city_v1',
   ADMIN_SETTINGS: 'smieciarka_admin_settings_v1',
+  GUEST_ITEM_TOKENS: 'smieciarka_guest_item_tokens_v1',
 };
 
 export interface AdminSettings {
@@ -539,6 +540,48 @@ export const StorageCache = {
       await AsyncStorage.setItem(KEYS.ADMIN_SETTINGS, JSON.stringify(settings));
     } catch {
       // Ignore write error
+    }
+  },
+
+  async getGuestItemTokens(): Promise<Record<string, string>> {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.GUEST_ITEM_TOKENS);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return typeof parsed === 'object' && parsed !== null ? parsed : {};
+    } catch {
+      return {};
+    }
+  },
+
+  async getGuestItemToken(itemId: string): Promise<string | null> {
+    try {
+      const tokens = await this.getGuestItemTokens();
+      return tokens[itemId] || null;
+    } catch {
+      return null;
+    }
+  },
+
+  async saveGuestItemToken(itemId: string, token: string): Promise<void> {
+    try {
+      const tokens = await this.getGuestItemTokens();
+      tokens[itemId] = token;
+      await AsyncStorage.setItem(KEYS.GUEST_ITEM_TOKENS, JSON.stringify(tokens));
+    } catch {
+      // Ignore write error
+    }
+  },
+
+  async removeGuestItemToken(itemId: string): Promise<void> {
+    try {
+      const tokens = await this.getGuestItemTokens();
+      if (tokens[itemId]) {
+        delete tokens[itemId];
+        await AsyncStorage.setItem(KEYS.GUEST_ITEM_TOKENS, JSON.stringify(tokens));
+      }
+    } catch {
+      // Ignore error
     }
   },
 
