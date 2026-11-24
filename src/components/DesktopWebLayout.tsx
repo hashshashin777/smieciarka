@@ -31,7 +31,7 @@ import {
   getNeighborhoodSubtitle,
   isDistanceInNeighborhood,
 } from '../services/storageCache';
-import { resolveBannerImages } from '../constants/banners';
+import { resolveBannerImages, resolveBannerSource } from '../constants/banners';
 import { fetchAirQuality, AirQualityData } from '../services/airQuality';
 import { getCalendarWeekDays } from './EcoImpactCard';
 import { WebLeafletMap } from './WebLeafletMap';
@@ -158,6 +158,10 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const webBanners = useMemo(
     () => resolveBannerImages('web', adminSettings?.customBanners),
+    [adminSettings?.customBanners]
+  );
+  const topHeaderBannerSource = useMemo(
+    () => resolveBannerSource('top_header', adminSettings?.customBanners),
     [adminSettings?.customBanners]
   );
 
@@ -291,6 +295,31 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
       contentContainerStyle={styles.pageContent}
       showsVerticalScrollIndicator={true}
     >
+      {/* 0. BANER REKLAMOWY NAD LOGO I PANELEM NAWIGACYJNYM */}
+      {adminSettings?.adsEnabled !== false && (
+        <View style={styles.topAdLeaderboardOuter}>
+          <TouchableOpacity
+            style={styles.topAdLeaderboardLink}
+            onPress={() => {
+              void safeOpenUrl(
+                'https://wystawka.fun/reklama',
+                'Reklama w serwisie Wystawka',
+                'Skontaktuj się z nami, aby zareklamować swoją markę lub usługi na Wystawce!'
+              );
+            }}
+            activeOpacity={0.92}
+            accessibilityRole="link"
+            accessibilityLabel="Baner reklamowy: Tu jest miejsce na Twoją reklamę – Zareklamuj się"
+          >
+            <Image
+              source={topHeaderBannerSource}
+              style={styles.topAdLeaderboardImage}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* 1. TOP NAVBAR (Głęboki szmaragd z efektem Glassmorphism) */}
       <header style={{ width: '100%', position: 'sticky', top: 0, zIndex: 100 } as any}>
         <View style={styles.topNavbar}>
@@ -1661,6 +1690,30 @@ const styles = StyleSheet.create({
   pageContent: {
     alignItems: 'center',
     paddingBottom: 0,
+  },
+
+  // 0. TOP AD BANNER (Nad logo i panelem nawigacyjnym)
+  topAdLeaderboardOuter: {
+    width: '100%',
+    backgroundColor: '#00351E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    zIndex: 101,
+  },
+  topAdLeaderboardLink: {
+    width: '100%',
+    maxWidth: 1240,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    cursor: 'pointer' as any,
+  },
+  topAdLeaderboardImage: {
+    width: '100%',
+    height: '100%',
   },
 
   // 1. TOP NAVBAR (Głęboki szmaragd Zero-Waste z efektem Glassmorphism)

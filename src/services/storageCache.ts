@@ -480,7 +480,7 @@ export const StorageCache = {
         const parsed = JSON.parse(raw);
         const cleanedBanners: CustomBannerImages = {};
         if (parsed.customBanners && typeof parsed.customBanners === 'object') {
-          const slots: BannerSlotId[] = ['home', 'web', 'map', 'list', 'board', 'saved'];
+          const slots: BannerSlotId[] = ['home', 'web', 'map', 'list', 'board', 'saved', 'top_header'];
           for (const slot of slots) {
             const val = parsed.customBanners[slot];
             if (Array.isArray(val)) {

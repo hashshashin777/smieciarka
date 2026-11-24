@@ -68,6 +68,7 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
     list: { status: 'published' },
     board: { status: 'published' },
     saved: { status: 'published' },
+    top_header: { status: 'published' },
   });
 
   // ADM-11: Historia wersji i rollback
