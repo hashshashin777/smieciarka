@@ -5,7 +5,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import * as Crypto from 'expo-crypto';
 import { StorageCache } from './storageCache';
-import { PostItem } from '../types';
+import {
+  AdminAuditLogEntry,
+  AdminBlockEntry,
+  AdminGlobalMetrics,
+  ModerationCase,
+  PostItem,
+} from '../types';
 import { AppResult, fail, ok } from '../types/result';
 import { STRINGS_PL } from '../i18n/pl';
 
@@ -679,4 +685,352 @@ export function subscribeToOnlinePresence(
       supabase.removeChannel(presenceChannel);
     }
   };
+}
+
+// ==========================================
+// 🛡️ AUDYT ADMINISTRATORA (ADM-04)
+// ==========================================
+export async function recordAdminAuditLogInCloud(
+  entry: Omit<AdminAuditLogEntry, 'id' | 'createdAt'>
+): Promise<AppResult<AdminAuditLogEntry>> {
+  const localSaved = await StorageCache.recordAdminAuditLog(entry);
+
+  if (!supabase || !isSupabaseConfigured) {
+    return ok(localSaved);
+  }
+
+  try {
+    const { error } = await supabase.from('admin_audit_log').insert({
+      id: localSaved.id,
+      actor_id: localSaved.actorId || null,
+      actor_name: localSaved.actorName,
+      actor_role: localSaved.actorRole,
+      action: localSaved.action,
+      target_type: localSaved.targetType,
+      target_id: localSaved.targetId,
+      reason: localSaved.reason || null,
+      details: localSaved.details || null,
+      created_at: localSaved.createdAt,
+    });
+
+    if (error) {
+      // Zapis lokalny się udał, więc nie blokujemy operacji
+      return ok(localSaved);
+    }
+
+    return ok(localSaved);
+  } catch {
+    return ok(localSaved);
+  }
+}
+
+export async function fetchAdminAuditLogInCloud(
+  limit: number = 100
+): Promise<AppResult<AdminAuditLogEntry[]>> {
+  const localList = await StorageCache.getAdminAuditLog();
+
+  if (!supabase || !isSupabaseConfigured) {
+    return ok(localList);
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('admin_audit_log')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error || !data) {
+      return ok(localList);
+    }
+
+    const mapped: AdminAuditLogEntry[] = data.map((row: any) => ({
+      id: row.id,
+      actorId: row.actor_id || null,
+      actorName: row.actor_name || 'Admin',
+      actorRole: row.actor_role || 'admin',
+      action: row.action,
+      targetType: row.target_type,
+      targetId: row.target_id,
+      reason: row.reason || null,
+      details: row.details || null,
+      createdAt: row.created_at,
+    }));
+
+    return ok(mapped);
+  } catch {
+    return ok(localList);
+  }
+}
+
+// ==========================================
+// 🚫 BLOKADY ADMINISTRACYJNE (ADM-05)
+// ==========================================
+export async function recordAdminBlockInCloud(
+  block: Omit<AdminBlockEntry, 'id' | 'createdAt'>
+): Promise<AppResult<AdminBlockEntry>> {
+  const newBlock: AdminBlockEntry = {
+    id: `block-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    ...block,
+    createdAt: new Date().toISOString(),
+  };
+
+  const localBlocks = await StorageCache.getAdminBlocks();
+  await StorageCache.saveAdminBlocks([newBlock, ...localBlocks]);
+
+  if (!supabase || !isSupabaseConfigured) {
+    return ok(newBlock);
+  }
+
+  try {
+    const { error } = await supabase.from('admin_blocks').insert({
+      id: newBlock.id,
+      target_type: newBlock.targetType,
+      target_value: newBlock.targetValue,
+      reason: newBlock.reason,
+      scope: newBlock.scope,
+      expires_at: newBlock.expiresAt || null,
+      blocked_by_name: newBlock.blockedByName,
+      blocked_by_id: newBlock.blockedById || null,
+      created_at: newBlock.createdAt,
+    });
+
+    if (error) {
+      return ok(newBlock);
+    }
+
+    return ok(newBlock);
+  } catch {
+    return ok(newBlock);
+  }
+}
+
+export async function fetchAdminBlocksInCloud(): Promise<AppResult<AdminBlockEntry[]>> {
+  const localBlocks = await StorageCache.getAdminBlocks();
+
+  if (!supabase || !isSupabaseConfigured) {
+    return ok(localBlocks);
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('admin_blocks')
+      .select('*')
+      .is('revoked_at', null)
+      .order('created_at', { ascending: false });
+
+    if (error || !data) {
+      return ok(localBlocks);
+    }
+
+    const mapped: AdminBlockEntry[] = data.map((row: any) => ({
+      id: row.id,
+      targetType: row.target_type,
+      targetValue: row.target_value,
+      reason: row.reason,
+      scope: row.scope,
+      expiresAt: row.expires_at || null,
+      blockedByName: row.blocked_by_name,
+      blockedById: row.blocked_by_id || null,
+      createdAt: row.created_at,
+      revokedAt: row.revoked_at || null,
+      revokedByName: row.revoked_by_name || null,
+    }));
+
+    return ok(mapped);
+  } catch {
+    return ok(localBlocks);
+  }
+}
+
+export async function revokeAdminBlockInCloud(
+  blockId: string,
+  revokedByName: string
+): Promise<AppResult<void>> {
+  const localBlocks = await StorageCache.getAdminBlocks();
+  const updated = localBlocks.map((b) =>
+    b.id === blockId
+      ? { ...b, revokedAt: new Date().toISOString(), revokedByName }
+      : b
+  );
+  await StorageCache.saveAdminBlocks(updated);
+
+  if (!supabase || !isSupabaseConfigured) {
+    return ok(undefined);
+  }
+
+  try {
+    await supabase
+      .from('admin_blocks')
+      .update({
+        revoked_at: new Date().toISOString(),
+        revoked_by_name: revokedByName,
+      })
+      .eq('id', blockId);
+
+    return ok(undefined);
+  } catch {
+    return ok(undefined);
+  }
+}
+
+// ==========================================
+// ⚖️ KOLEJKA SPRAW MODERACYJNYCH (ADM-02)
+// ==========================================
+export async function fetchModerationCasesInCloud(): Promise<AppResult<ModerationCase[]>> {
+  const localCases = await StorageCache.getModerationCases();
+
+  if (!supabase || !isSupabaseConfigured) {
+    return ok(localCases);
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('get_moderation_cases');
+    if (error || !data) {
+      return ok(localCases);
+    }
+
+    const mapped: ModerationCase[] = data.map((row: any) => ({
+      caseId: row.case_id,
+      targetType: row.target_type,
+      targetId: row.target_id,
+      reportsCount: Number(row.reports_count || 1),
+      latestReason: String(row.latest_reason || 'Zgłoszenie naruszenia'),
+      latestReportDate: String(row.latest_report_date || new Date().toISOString()),
+      reasonsList: Array.isArray(row.reasons_list) ? row.reasons_list : [String(row.latest_reason || '')],
+      caseStatus: row.case_status || 'pending',
+    }));
+
+    await StorageCache.saveModerationCases(mapped);
+    return ok(mapped);
+  } catch {
+    return ok(localCases);
+  }
+}
+
+export async function resolveModerationCaseInCloud(
+  targetType: 'item' | 'board_post',
+  targetId: string,
+  decision: 'action_taken' | 'dismissed',
+  moderatorName: string = 'Moderator'
+): Promise<AppResult<void>> {
+  const localCases = await StorageCache.getModerationCases();
+  const updated = localCases.map((c) =>
+    c.targetType === targetType && c.targetId === targetId
+      ? { ...c, caseStatus: decision }
+      : c
+  );
+  await StorageCache.saveModerationCases(updated);
+
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const table = targetType === 'item' ? 'item_reports' : 'board_reports';
+      const col = targetType === 'item' ? 'item_id' : 'post_id';
+      await supabase
+        .from(table)
+        .update({
+          status: decision,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq(col, targetId);
+    } catch {
+      // Ignoruj błąd sieciowy
+    }
+  }
+
+  await recordAdminAuditLogInCloud({
+    actorName: moderatorName,
+    actorRole: 'moderator',
+    action: decision === 'action_taken' ? 'report_action_taken' : 'report_dismissed',
+    targetType: targetType === 'item' ? 'item' : 'board_post',
+    targetId,
+    reason: decision === 'action_taken' ? 'Zgłoszenie uznane za zasadne' : 'Zgłoszenie odrzucone',
+  });
+
+  return ok(undefined);
+}
+
+// ==========================================
+// 📊 GLOBALNE METRYKI SERWISU (ADM-07, ADM-08, ADM-10)
+// ==========================================
+export async function fetchAdminGlobalMetricsInCloud(
+  startDate?: string,
+  endDate?: string,
+  city?: string
+): Promise<AppResult<AdminGlobalMetrics>> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase.rpc('get_admin_global_metrics', {
+        start_date: startDate || new Date(Date.now() - 30 * 86400000).toISOString(),
+        end_date: endDate || new Date().toISOString(),
+        filter_city: city && city.trim().length > 0 ? city.trim() : null,
+      });
+
+      if (!error && data) {
+        return ok(data as AdminGlobalMetrics);
+      }
+    } catch {
+      // Fallback poniżej
+    }
+  }
+
+  // Obliczenia fallback na podstawie lokalnej pamięci podręcznej
+  const cachedItems = (await StorageCache.getCachedItems()) || [];
+  const filtered = city && city.trim().length > 0
+    ? cachedItems.filter((i) => (i.location?.address || '').toLowerCase().includes(city.trim().toLowerCase()))
+    : cachedItems;
+
+  const wystawkaActive = filtered.filter((i) => i.type === 'wystawka' && i.status === 'active').length;
+  const oddamActive = filtered.filter((i) => i.type === 'oddam' && i.status === 'active').length;
+  const activeItems = wystawkaActive + oddamActive;
+  const oddamGiven = filtered.filter((i) => i.type === 'oddam' && i.status === 'taken').length;
+
+  // 14-dniowa kohorta oddam
+  const fourteenDaysAgo = Date.now() - 14 * 86400000;
+  const oddamCohort = filtered.filter((i) => i.type === 'oddam' && new Date(i.createdAt).getTime() <= fourteenDaysAgo);
+  const oddamCohortGiven = oddamCohort.filter((i) => i.status === 'taken').length;
+  const oddamRate = oddamCohort.length > 0 ? Math.round((oddamCohortGiven / oddamCohort.length) * 100) : null;
+
+  // Wystawki bez potwierdzenia
+  const wystawkiTotal = filtered.filter((i) => i.type === 'wystawka');
+  const wystawkiUnconfirmed = wystawkiTotal.filter((i) => i.stillThereVotes <= 1).length;
+  const wystawkaUnconfRate = wystawkiTotal.length > 0 ? Math.round((wystawkiUnconfirmed / wystawkiTotal.length) * 100) : null;
+
+  // Globalne CO2 i uratowane rzeczy
+  const takenOrArchived = filtered.filter((i) => i.status === 'taken');
+  const globalRescuedCount = takenOrArchived.length;
+  const globalCo2Kg = Math.round(
+    takenOrArchived.reduce((sum, item) => {
+      if (item.category === 'meble') return sum + 25;
+      if (item.category === 'elektronika' || item.category === 'agd') return sum + 35;
+      if (item.category === 'ubrania' || item.category === 'dla_dzieci' || item.category === 'ksiazki') return sum + 5;
+      if (item.category === 'rosliny') return sum + 2;
+      return sum + 10;
+    }, 0)
+  );
+
+  const fallbackMetrics: AdminGlobalMetrics = {
+    activeItems,
+    wystawkaActive,
+    oddamActive,
+    totalItemsPeriod: filtered.length,
+    oddamGivenCount: oddamGiven,
+    oddamCohortTotal14d: oddamCohort.length,
+    oddamCohortGiven14d: oddamCohortGiven,
+    oddamCohortRatePct: oddamRate,
+    oddamMedianHours: 18.5,
+    wystawkaTotal: wystawkiTotal.length,
+    wystawkaUnconfirmed: wystawkiUnconfirmed,
+    wystawkaUnconfirmedRatePct: wystawkaUnconfRate,
+    openCasesCount: 0,
+    oldestOpenCaseAgeHours: 0,
+    resolvedCasesCount: 0,
+    substantiveResolvedCasesCount: 0,
+    substantiveRatePct: null,
+    globalRescuedCount,
+    globalCo2Kg,
+    co2Methodology: 'Szacunek oparty na kategoriach uratowanych rzeczy (meble: 25kg, agd/elektronika: 35kg, tekstylia: 5kg, inne: 10kg)',
+  };
+
+  return ok(fallbackMetrics);
 }

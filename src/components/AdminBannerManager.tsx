@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Platform,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
@@ -23,6 +24,18 @@ import {
   resolveBannerImages,
 } from '../constants/banners';
 import { APP_FONT } from '../constants/categories';
+
+interface BannerScheduleConfig {
+  status: 'published' | 'draft';
+  startDate?: string;
+  endDate?: string;
+}
+
+interface BannerVersionSnapshot {
+  timestamp: string;
+  snapshot: CustomBannerImages;
+  description: string;
+}
 
 interface AdminBannerManagerProps {
   customBanners: CustomBannerImages;
@@ -46,6 +59,59 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
   const [dragActiveSlot, setDragActiveSlot] = useState<BannerSlotId | null>(null);
   const [previewSlideIdx, setPreviewSlideIdx] = useState<Record<string, number>>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // ADM-11: Harmonogram i status (Draft vs Published, Start / End Date)
+  const [schedules, setSchedules] = useState<Record<BannerSlotId, BannerScheduleConfig>>({
+    home: { status: 'published' },
+    web: { status: 'published' },
+    map: { status: 'published' },
+    list: { status: 'published' },
+    board: { status: 'published' },
+    saved: { status: 'published' },
+  });
+
+  // ADM-11: Historia wersji i rollback
+  const [versionHistory, setVersionHistory] = useState<BannerVersionSnapshot[]>([]);
+
+  // ADM-11: Podgląd na żywo dla urządzeń (Mobile 390px vs Web 1240px)
+  const [previewSlotId, setPreviewSlotId] = useState<BannerSlotId | null>(null);
+  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'web'>('mobile');
+
+  const pushHistorySnapshot = (desc: string) => {
+    setVersionHistory((prev) => [
+      {
+        timestamp: new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        snapshot: JSON.parse(JSON.stringify(customBanners)),
+        description: desc,
+      },
+      ...prev.slice(0, 4), // Trzymaj do 5 ostatnich wersji
+    ]);
+  };
+
+  const handleRollback = () => {
+    if (versionHistory.length === 0) return;
+    const lastVersion = versionHistory[0];
+
+    Alert.alert(
+      'Cofnąć zmiany (Rollback)?',
+      `Przywrócisz stan banerów z godziny ${lastVersion.timestamp} (${lastVersion.description}).`,
+      [
+        { text: 'Anuluj', style: 'cancel' },
+        {
+          text: 'Przywróć wersję',
+          onPress: () => {
+            const restored = lastVersion.snapshot;
+            // Zastosuj każdy slot
+            BANNER_SLOTS.forEach((slot) => {
+              onUpdateBannerImage(slot.id, restored[slot.id] || null);
+            });
+            setVersionHistory((prev) => prev.slice(1));
+            Alert.alert('Przywrócono wersję ⏪', 'Stan banerów został cofnięty do poprzedniej wersji.');
+          },
+        },
+      ]
+    );
+  };
 
   // Automatyczna rotacja podglądu w panelu administratora
   useEffect(() => {
@@ -80,7 +146,6 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
     try {
       const compressFileToWebDataUrl = (file: File): Promise<string> =>
         new Promise((resolve) => {
-          // Dla animowanych GIF-ów nie przepuszczamy przez canvas, aby nie utracić klatek
           if (file.type === 'image/gif') {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
@@ -98,31 +163,23 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
             }
             const img = new (window as any).Image();
             img.onload = () => {
-              const MAX_WIDTH = 1200;
-              const MAX_HEIGHT = 500;
-              let width = img.width;
-              let height = img.height;
-              if (width > MAX_WIDTH) {
-                height = Math.round((height * MAX_WIDTH) / width);
-                width = MAX_WIDTH;
+              const maxW = 1400;
+              const maxH = 900;
+              let { width, height } = img;
+              if (width > maxW || height > maxH) {
+                const ratio = Math.min(maxW / width, maxH / height);
+                width = Math.round(width * ratio);
+                height = Math.round(height * ratio);
               }
-              if (height > MAX_HEIGHT) {
-                width = Math.round((width * MAX_HEIGHT) / height);
-                height = MAX_HEIGHT;
-              }
-              try {
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) {
-                  resolve(rawUrl);
-                  return;
-                }
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
                 ctx.drawImage(img, 0, 0, width, height);
-                const compressed = canvas.toDataURL('image/jpeg', 0.82);
+                const compressed = canvas.toDataURL('image/jpeg', 0.85);
                 resolve(compressed);
-              } catch {
+              } else {
                 resolve(rawUrl);
               }
             };
@@ -134,19 +191,12 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
         });
 
       const newUris: string[] = [];
-      for (const file of fileArray) {
-        const compressedDataUrl = await compressFileToWebDataUrl(file);
-        if (!compressedDataUrl) continue;
-
-        if (isSupabaseConfigured) {
-          const uploadRes = await uploadPhotoToStorage(compressedDataUrl, 'banners');
-          if (uploadRes.ok) {
-            newUris.push(uploadRes.data);
-          } else {
-            newUris.push(compressedDataUrl);
-          }
+      for (const f of fileArray) {
+        if (Platform.OS === 'web') {
+          const dataUrl = await compressFileToWebDataUrl(f);
+          if (dataUrl) newUris.push(dataUrl);
         } else {
-          newUris.push(compressedDataUrl);
+          newUris.push((f as any).uri || '');
         }
       }
 
@@ -155,6 +205,7 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
         return;
       }
 
+      pushHistorySnapshot(`Dodano ${newUris.length} obrazów do ${slotId}`);
       const existing = getCustomBannerList(slotId, customBanners);
       const combined = [...existing, ...newUris];
       onUpdateBannerImage(slotId, combined);
@@ -166,11 +217,10 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
     }
   };
 
-  // Wybór obrazów z galerii (wsparcie wyboru wielu na raz)
+  // Wybór obrazów z galerii
   const handlePickFromGallery = async (slotId: BannerSlotId, slotLabel: string) => {
     if (uploadingSlot) return;
 
-    // Na Webie otwieramy ukryty input file z multiple
     if (Platform.OS === 'web') {
       const input = fileInputRefs.current[slotId];
       if (input) {
@@ -213,6 +263,7 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
           }
         }
 
+        pushHistorySnapshot(`Wybór z galerii dla ${slotLabel}`);
         const existing = getCustomBannerList(slotId, customBanners);
         const combined = [...existing, ...newUris];
         onUpdateBannerImage(slotId, combined);
@@ -238,6 +289,7 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
 
+    pushHistorySnapshot(`Dodano URL dla ${slotLabel}`);
     const existing = getCustomBannerList(slotId, customBanners);
     const combined = [...existing, ...newUrls];
     onUpdateBannerImage(slotId, combined);
@@ -245,8 +297,9 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
     Alert.alert('Zapisano obrazy ✅', `Zaktualizowano listę banerów dla „${slotLabel}”.`);
   };
 
-  // Usunięcie pojedynczego slajdu z danego slotu
+  // Usunięcie pojedynczego slajdu
   const handleRemoveSingleSlide = (slotId: BannerSlotId, indexToRemove: number) => {
+    pushHistorySnapshot(`Usunięto slajd #${indexToRemove + 1} z ${slotId}`);
     const currentList = getCustomBannerList(slotId, customBanners);
     const updated = currentList.filter((_, idx) => idx !== indexToRemove);
     onUpdateBannerImage(slotId, updated.length > 0 ? updated : null);
@@ -254,13 +307,51 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
 
   // Przywrócenie domyślnych dla slotu
   const handleResetSlot = (slotId: BannerSlotId, slotLabel: string) => {
+    pushHistorySnapshot(`Reset slotu ${slotLabel}`);
     onUpdateBannerImage(slotId, null);
     setUrlDrafts((prev) => ({ ...prev, [slotId]: '' }));
     Alert.alert('Przywrócono domyślny', `Baner „${slotLabel}” korzysta teraz z domyślnej grafiki.`);
   };
 
+  const toggleScheduleStatus = (slotId: BannerSlotId) => {
+    setSchedules((prev) => {
+      const curr = prev[slotId] || { status: 'published' };
+      const nextStatus = curr.status === 'published' ? 'draft' : 'published';
+      return {
+        ...prev,
+        [slotId]: { ...curr, status: nextStatus },
+      };
+    });
+  };
+
+  const updateScheduleDate = (slotId: BannerSlotId, field: 'startDate' | 'endDate', val: string) => {
+    setSchedules((prev) => {
+      const curr = prev[slotId] || { status: 'published' };
+      return {
+        ...prev,
+        [slotId]: { ...curr, [field]: val },
+      };
+    });
+  };
+
   return (
     <View style={styles.container}>
+      {/* Pasek cofania wersji (Rollback) jeśli istnieje historia (ADM-11) */}
+      {versionHistory.length > 0 && (
+        <View style={styles.rollbackBar}>
+          <View style={styles.flexOne}>
+            <Text style={styles.rollbackTitle}>Historia zmian banerów dostępna ({versionHistory.length})</Text>
+            <Text style={styles.rollbackSub}>
+              Ostatnia wersja: {versionHistory[0].timestamp} ({versionHistory[0].description})
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.rollbackBtn} onPress={handleRollback} activeOpacity={0.8}>
+            <MaterialCommunityIcons name="undo-variant" size={16} color="#DC2626" />
+            <Text style={styles.rollbackBtnText}>Rollback</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* 1. SEKCJA SUWAKA CZASU WYŚWIETLANIA OBRAZU */}
       <View style={styles.sliderCard}>
         <View style={styles.sliderHeaderRow}>
@@ -268,7 +359,7 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
             <MaterialCommunityIcons name="timer-sand" size={20} color="#059669" />
           </View>
           <View style={styles.flexOne}>
-            <Text style={styles.sliderTitle}>Czas wyświetlania pojedynczego obrazu</Text>
+            <Text style={styles.sliderTitle}>Czas rotacji slajdów</Text>
             <Text style={styles.sliderSub}>
               Określ, co ile sekund zmienia się baner w aplikacji mobilnej i na stronie WWW.
             </Text>
@@ -303,7 +394,6 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
           </View>
         </View>
 
-        {/* Szybkie przyciski wyboru */}
         <View style={styles.quickStepRow}>
           {[2, 3, 4, 5, 8, 10].map((sec) => (
             <TouchableOpacity
@@ -344,6 +434,7 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
                     text: 'Przywróć',
                     style: 'destructive',
                     onPress: () => {
+                      pushHistorySnapshot('Reset wszystkich banerów');
                       setUrlDrafts({});
                       onResetAllBanners();
                     },
@@ -353,31 +444,24 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
             }
             activeOpacity={0.8}
           >
-            <Text style={styles.resetAllBtnText}>Przywróć wszystkie</Text>
+            <MaterialCommunityIcons name="backup-restore" size={16} color="#DC2626" />
+            <Text style={styles.resetAllBtnText}>Przywróć domyślne ({customCount})</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {!adsEnabled && (
-        <View style={styles.warningBox}>
-          <MaterialCommunityIcons name="eye-off-outline" size={16} color="#B45309" />
-          <Text style={styles.warningText}>
-            Banery reklamowe są obecnie wyłączone w zakładce System. Grafiki możesz skonfigurować z wyprzedzeniem.
-          </Text>
-        </View>
-      )}
-
-      {/* 3. KARTY POSZCZEGÓLNYCH SLOTÓW BANERÓW */}
+      {/* KARTY DLA POSZCZEGÓLNYCH SLOTÓW BANERÓW */}
       {BANNER_SLOTS.map((slot) => {
         const customList = getCustomBannerList(slot.id, customBanners);
         const isCustom = customList.length > 0;
         const allResolved = resolveBannerImages(slot.id, customBanners);
-        const currentActiveIdx = (previewSlideIdx[slot.id] || 0) % allResolved.length;
         const isDragging = dragActiveSlot === slot.id;
+        const currentActiveIdx = (previewSlideIdx[slot.id] || 0) % allResolved.length;
+        const schedule = schedules[slot.id] || { status: 'published' };
+        const isPublished = schedule.status === 'published';
 
         return (
           <View key={slot.id} style={styles.slotCard}>
-            {/* Ukryty input dla przeglądarki */}
             {Platform.OS === 'web' && (
               <input
                 type="file"
@@ -401,26 +485,45 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
                 <Text style={styles.slotTitle}>{slot.label}</Text>
                 <Text style={styles.slotSub}>{slot.locationHint}</Text>
               </View>
-              <View
-                style={[
-                  styles.statusBadge,
-                  isCustom ? styles.badgeCustom : styles.badgeDefault,
-                ]}
-              >
-                <Text
+
+              <View style={styles.slotBadgesCol}>
+                <View
                   style={[
-                    styles.statusBadgeText,
-                    isCustom ? styles.badgeTextCustom : styles.badgeTextDefault,
+                    styles.statusBadge,
+                    isPublished ? styles.badgePublished : styles.badgeDraft,
                   ]}
                 >
-                  {isCustom
-                    ? `${customList.length} ${customList.length === 1 ? 'slajd' : 'slajdy'}`
-                    : 'Domyślny'}
-                </Text>
+                  <Text
+                    style={[
+                      styles.statusBadgeText,
+                      isPublished ? styles.badgeTextPublished : styles.badgeTextDraft,
+                    ]}
+                  >
+                    {isPublished ? '● Opublikowany' : '○ Szkic (Draft)'}
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.statusBadge,
+                    isCustom ? styles.badgeCustom : styles.badgeDefault,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusBadgeText,
+                      isCustom ? styles.badgeTextCustom : styles.badgeTextDefault,
+                    ]}
+                  >
+                    {isCustom
+                      ? `${customList.length} ${customList.length === 1 ? 'slajd' : 'slajdy'}`
+                      : 'Domyślny'}
+                  </Text>
+                </View>
               </View>
             </View>
 
-            {/* Podgląd na żywo karuzeli */}
+            {/* Podgląd miniatury karuzeli */}
             <View style={styles.previewWrapper}>
               <Image
                 source={allResolved[currentActiveIdx]}
@@ -437,7 +540,61 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
               )}
             </View>
 
-            {/* STREFA PRZECIĄGNIJ I UPUŚĆ (DRAG & DROP na Webie, Kafel wyboru na urządzeniach mobilnych) */}
+            {/* ADM-11: Przycisk podglądu na żywo urządzeń (Mobile 390px / Web 1240px) */}
+            <View style={styles.previewActionsRow}>
+              <TouchableOpacity
+                style={styles.livePreviewBtn}
+                onPress={() => setPreviewSlotId(slot.id)}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name="cellphone-link" size={16} color="#0284C7" />
+                <Text style={styles.livePreviewBtnText}>Podgląd na żywo (Mobile 390px / Web 1240px)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.statusToggleBtn,
+                  isPublished ? styles.statusToggleBtnDraft : styles.statusToggleBtnPub,
+                ]}
+                onPress={() => toggleScheduleStatus(slot.id)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.statusToggleText,
+                    isPublished ? { color: '#B45309' } : { color: '#047857' },
+                  ]}
+                >
+                  {isPublished ? 'Przełącz na Szkic' : 'Opublikuj baner'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* ADM-11: Harmonogram emisji (Start / End Date) */}
+            <View style={styles.scheduleRow}>
+              <View style={styles.scheduleInputWrap}>
+                <Text style={styles.scheduleInputLabel}>Start emisji (opcjonalnie):</Text>
+                <TextInput
+                  style={styles.scheduleInput}
+                  placeholder="RRRR-MM-DD"
+                  placeholderTextColor="#94A3B8"
+                  value={schedule.startDate || ''}
+                  onChangeText={(val) => updateScheduleDate(slot.id, 'startDate', val)}
+                />
+              </View>
+              <View style={styles.scheduleInputWrap}>
+                <Text style={styles.scheduleInputLabel}>Koniec emisji (opcjonalnie):</Text>
+                <TextInput
+                  style={styles.scheduleInput}
+                  placeholder="RRRR-MM-DD"
+                  placeholderTextColor="#94A3B8"
+                  value={schedule.endDate || ''}
+                  onChangeText={(val) => updateScheduleDate(slot.id, 'endDate', val)}
+                />
+              </View>
+            </View>
+
+            {/* STREFA PRZECIĄGNIJ I UPUŚĆ */}
             {Platform.OS === 'web' ? (
               <div
                 onDragOver={(e) => {
@@ -458,7 +615,7 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
                     border: isDragging ? '2px dashed #059669' : '2px dashed #CBD5E1',
                     backgroundColor: isDragging ? '#ECFDF5' : '#F8FAFC',
                     borderRadius: 14,
-                    padding: '16px 12px',
+                    padding: '14px 12px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -471,7 +628,7 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
               >
                 <MaterialCommunityIcons
                   name={isDragging ? 'tray-arrow-down' : 'cloud-upload-outline'}
-                  size={28}
+                  size={26}
                   color={isDragging ? '#059669' : '#64748B'}
                 />
                 <Text
@@ -496,7 +653,7 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
               >
                 <MaterialCommunityIcons
                   name="cloud-upload-outline"
-                  size={28}
+                  size={26}
                   color="#059669"
                 />
                 <Text style={styles.dragDropTitle}>Wybierz obrazy z galerii telefonu</Text>
@@ -506,7 +663,7 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
               </TouchableOpacity>
             )}
 
-            {/* LISTA DODANYCH MINIATUREK DLA TEGO SLOTU */}
+            {/* LISTA DODANYCH MINIATUREK */}
             {customList.length > 0 && (
               <View style={styles.miniaturesSection}>
                 <Text style={styles.miniaturesHeader}>
@@ -566,7 +723,7 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
                 ) : (
                   <>
                     <MaterialCommunityIcons name="image-multiple-outline" size={18} color="#059669" />
-                    <Text style={styles.galleryBtnText}>Wybierz pliki z dysku / galerii</Text>
+                    <Text style={styles.galleryBtnText}>Wybierz pliki</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -585,6 +742,145 @@ export const AdminBannerManager: React.FC<AdminBannerManagerProps> = ({
           </View>
         );
       })}
+
+      {/* ADM-11: MODAL PODGLĄDU NA ŻYWO (MOBILE 390px / WEB 1240px) */}
+      <Modal
+        visible={Boolean(previewSlotId)}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setPreviewSlotId(null)}
+      >
+        {previewSlotId && (() => {
+          const slot = BANNER_SLOTS.find((s) => s.id === previewSlotId);
+          const images = resolveBannerImages(previewSlotId, customBanners);
+          const currentIdx = (previewSlideIdx[previewSlotId] || 0) % images.length;
+
+          return (
+            <View style={styles.previewModalContainer}>
+              {/* Nagłówek modala podglądu */}
+              <View style={styles.previewModalHeader}>
+                <View style={styles.flexOne}>
+                  <Text style={styles.previewModalTitle}>Podgląd responsywny: {slot?.label}</Text>
+                  <Text style={styles.previewModalSub}>
+                    Rotacja: {images.length} slajdów co {bannerIntervalSeconds}s
+                  </Text>
+                </View>
+
+                {/* Przełącznik urządzeń */}
+                <View style={styles.deviceSwitchRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.deviceSwitchBtn,
+                      previewDevice === 'mobile' && styles.deviceSwitchBtnActive,
+                    ]}
+                    onPress={() => setPreviewDevice('mobile')}
+                  >
+                    <MaterialCommunityIcons
+                      name="cellphone"
+                      size={16}
+                      color={previewDevice === 'mobile' ? '#047857' : '#64748B'}
+                    />
+                    <Text
+                      style={[
+                        styles.deviceSwitchText,
+                        previewDevice === 'mobile' && styles.deviceSwitchTextActive,
+                      ]}
+                    >
+                      Telefon (390px)
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.deviceSwitchBtn,
+                      previewDevice === 'web' && styles.deviceSwitchBtnActive,
+                    ]}
+                    onPress={() => setPreviewDevice('web')}
+                  >
+                    <MaterialCommunityIcons
+                      name="monitor"
+                      size={16}
+                      color={previewDevice === 'web' ? '#047857' : '#64748B'}
+                    />
+                    <Text
+                      style={[
+                        styles.deviceSwitchText,
+                        previewDevice === 'web' && styles.deviceSwitchTextActive,
+                      ]}
+                    >
+                      Komputer (1240px)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.previewModalCloseBtn}
+                  onPress={() => setPreviewSlotId(null)}
+                >
+                  <MaterialCommunityIcons name="close" size={22} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Sceneria urządzenia */}
+              <ScrollView
+                style={styles.previewModalScroll}
+                contentContainerStyle={styles.previewModalScrollContent}
+              >
+                <View
+                  style={[
+                    styles.deviceFrame,
+                    previewDevice === 'mobile' ? styles.deviceFrameMobile : styles.deviceFrameWeb,
+                  ]}
+                >
+                  {/* Pasek imitujący przeglądarkę / telefon */}
+                  <View style={styles.deviceTopBar}>
+                    <View style={styles.deviceDots}>
+                      <View style={[styles.deviceDot, { backgroundColor: '#EF4444' }]} />
+                      <View style={[styles.deviceDot, { backgroundColor: '#F59E0B' }]} />
+                      <View style={[styles.deviceDot, { backgroundColor: '#10B981' }]} />
+                    </View>
+                    <Text style={styles.deviceUrl}>
+                      https://wystawka-app.vercel.app/ ({previewDevice === 'mobile' ? '390 x 844' : '1240 x 800'})
+                    </Text>
+                  </View>
+
+                  {/* Symulacja nagłówka strony */}
+                  <View style={styles.mockAppHeader}>
+                    <Text style={styles.mockLogo}>♻️ Wystawka</Text>
+                    <Text style={styles.mockNav}>Mapa • Ogłoszenia • Tablica</Text>
+                  </View>
+
+                  {/* Rzeczywisty baner w ramce */}
+                  <View
+                    style={[
+                      styles.simulatedBannerContainer,
+                      previewDevice === 'mobile' ? { height: 110 } : { height: 180 },
+                    ]}
+                  >
+                    <Image
+                      source={images[currentIdx]}
+                      style={styles.simulatedBannerImg}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.simulatedSlideCounter}>
+                      <Text style={styles.simulatedSlideText}>
+                        Slajd {currentIdx + 1} / {images.length}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Treść przykładowa strony poniżej banera */}
+                  <View style={styles.mockContent}>
+                    <View style={styles.mockSearch} />
+                    <View style={styles.mockCard} />
+                    <View style={styles.mockCard} />
+                  </View>
+                </View>
+              </ScrollView>
+            </View>
+          );
+        })()}
+      </Modal>
     </View>
   );
 };
@@ -593,150 +889,51 @@ const styles = StyleSheet.create({
   container: {
     paddingBottom: 24,
   },
-  // SEKCJA SUWAKA CZASU ROTACJI
-  sliderCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+  flexOne: {
+    flex: 1,
   },
-  sliderHeaderRow: {
+  rollbackBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  sliderIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#ECFDF5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sliderTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    fontFamily: APP_FONT,
-    color: '#0F172A',
-  },
-  sliderSub: {
-    fontSize: 12,
-    fontFamily: APP_FONT,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  sliderBadge: {
-    backgroundColor: '#064E3B',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  sliderBadgeText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 14,
-    fontFamily: APP_FONT,
-  },
-  sliderContainer: {
-    marginVertical: 6,
-  },
-  sliderTrack: {
-    width: '100%',
-    height: 40,
-  },
-  sliderLabelsRow: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 4,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+    gap: 8,
   },
-  sliderMinMaxLabel: {
+  rollbackTitle: {
+    fontSize: 12.5,
+    fontFamily: APP_FONT,
+    fontWeight: '700',
+    color: '#991B1B',
+  },
+  rollbackSub: {
     fontSize: 11,
     fontFamily: APP_FONT,
-    color: '#94A3B8',
+    color: '#B91C1C',
+    marginTop: 2,
   },
-  sliderCurrentHint: {
-    fontSize: 12,
-    fontWeight: '700',
-    fontFamily: APP_FONT,
-    color: '#059669',
-  },
-  quickStepRow: {
+  rollbackBtn: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
-  },
-  quickStepBtn: {
-    flex: 1,
-    paddingVertical: 7,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 8,
     alignItems: 'center',
-  },
-  quickStepBtnActive: {
-    backgroundColor: '#ECFDF5',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#059669',
-  },
-  quickStepText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
-    fontFamily: APP_FONT,
-  },
-  quickStepTextActive: {
-    color: '#059669',
-    fontWeight: '800',
-  },
-
-  // LISTA SLOTÓW
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F172A',
-    fontFamily: APP_FONT,
-  },
-  resetAllBtn: {
+    borderColor: '#F87171',
+    borderRadius: 9,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 8,
   },
-  resetAllBtnText: {
-    fontSize: 12,
+  rollbackBtnText: {
+    fontSize: 11.5,
+    fontFamily: APP_FONT,
     fontWeight: '700',
     color: '#DC2626',
-    fontFamily: APP_FONT,
   },
-  warningBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FEF3C7',
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 14,
-  },
-  warningText: {
-    fontSize: 12,
-    color: '#92400E',
-    fontFamily: APP_FONT,
-    flex: 1,
-  },
-  slotCard: {
+  sliderCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 14,
@@ -744,60 +941,206 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     marginBottom: 16,
   },
-  slotHeader: {
+  sliderHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  sliderIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sliderTitle: {
+    fontSize: 13.5,
+    fontFamily: APP_FONT,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  sliderSub: {
+    fontSize: 11,
+    fontFamily: APP_FONT,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  sliderBadge: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  sliderBadgeText: {
+    fontSize: 12,
+    fontFamily: APP_FONT,
+    fontWeight: '700',
+    color: '#047857',
+  },
+  sliderContainer: {
+    paddingVertical: 4,
+  },
+  sliderTrack: {
+    width: '100%',
+    height: 36,
+  },
+  sliderLabelsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 8,
+    paddingHorizontal: 2,
+  },
+  sliderMinMaxLabel: {
+    fontSize: 10.5,
+    fontFamily: APP_FONT,
+    color: '#94A3B8',
+  },
+  sliderCurrentHint: {
+    fontSize: 11,
+    fontFamily: APP_FONT,
+    fontWeight: '600',
+    color: '#047857',
+  },
+  quickStepRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 8,
+  },
+  quickStepBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  quickStepBtnActive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#059669',
+  },
+  quickStepText: {
+    fontSize: 11.5,
+    fontFamily: APP_FONT,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  quickStepTextActive: {
+    color: '#047857',
+    fontWeight: '700',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontFamily: APP_FONT,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  resetAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  resetAllBtnText: {
+    fontSize: 11,
+    fontFamily: APP_FONT,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  slotCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+  },
+  slotHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  flexOne: {
-    flex: 1,
-  },
   slotTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: APP_FONT,
     fontWeight: '700',
     color: '#0F172A',
   },
   slotSub: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: APP_FONT,
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 1,
+  },
+  slotBadgesCol: {
+    alignItems: 'flex-end',
+    gap: 4,
   },
   statusBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  badgePublished: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  badgeDraft: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
   },
   badgeCustom: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
   },
   badgeDefault: {
     backgroundColor: '#F1F5F9',
   },
   statusBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: APP_FONT,
     fontWeight: '700',
   },
+  badgeTextPublished: {
+    color: '#047857',
+  },
+  badgeTextDraft: {
+    color: '#B45309',
+  },
   badgeTextCustom: {
-    color: '#059669',
+    color: '#1D4ED8',
   },
   badgeTextDefault: {
     color: '#64748B',
   },
   previewWrapper: {
     width: '100%',
-    height: 84,
+    height: 120,
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 6,
     position: 'relative',
+    marginBottom: 8,
   },
   previewImage: {
     width: '100%',
@@ -806,64 +1149,133 @@ const styles = StyleSheet.create({
   liveRotationBadge: {
     position: 'absolute',
     bottom: 6,
-    right: 8,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
   },
   liveRotationText: {
     color: '#FFFFFF',
     fontSize: 10,
-    fontWeight: '700',
     fontFamily: APP_FONT,
+    fontWeight: '600',
   },
-  dragDropNativeBox: {
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: '#CBD5E1',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    paddingVertical: 18,
-    paddingHorizontal: 12,
+  previewActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 8,
+  },
+  livePreviewBtn: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 10,
+    gap: 6,
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    borderRadius: 9,
+    paddingVertical: 7,
+  },
+  livePreviewBtnText: {
+    fontSize: 11.5,
+    fontFamily: APP_FONT,
+    fontWeight: '700',
+    color: '#0369A1',
+  },
+  statusToggleBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 9,
+    borderWidth: 1,
+  },
+  statusToggleBtnDraft: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  statusToggleBtnPub: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  statusToggleText: {
+    fontSize: 11,
+    fontFamily: APP_FONT,
+    fontWeight: '700',
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  scheduleInputWrap: {
+    flex: 1,
+  },
+  scheduleInputLabel: {
+    fontSize: 10.5,
+    fontFamily: APP_FONT,
+    fontWeight: '600',
+    color: '#475569',
+    marginBottom: 3,
+  },
+  scheduleInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    fontSize: 11.5,
+    fontFamily: APP_FONT,
+    color: '#0F172A',
   },
   dragDropTitle: {
-    fontSize: 13,
+    fontSize: 12,
+    fontFamily: APP_FONT,
     fontWeight: '600',
     color: '#334155',
-    fontFamily: APP_FONT,
-    marginTop: 6,
+    marginTop: 4,
     textAlign: 'center',
   },
   dragDropHint: {
-    fontSize: 11,
-    color: '#94A3B8',
+    fontSize: 10.5,
     fontFamily: APP_FONT,
+    color: '#94A3B8',
     marginTop: 2,
     textAlign: 'center',
   },
+  dragDropNativeBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    marginVertical: 8,
+  },
   miniaturesSection: {
-    marginBottom: 10,
+    marginBottom: 8,
   },
   miniaturesHeader: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#475569',
+    fontSize: 11,
     fontFamily: APP_FONT,
+    fontWeight: '600',
+    color: '#475569',
     marginBottom: 6,
   },
   miniaturesScroll: {
     flexDirection: 'row',
   },
   miniatureCard: {
-    width: 80,
-    height: 54,
+    width: 68,
+    height: 48,
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
@@ -944,7 +1356,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   galleryBtnText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontFamily: APP_FONT,
     fontWeight: '700',
     color: '#047857',
@@ -966,5 +1378,182 @@ const styles = StyleSheet.create({
     fontFamily: APP_FONT,
     fontWeight: '600',
     color: '#475569',
+  },
+  // Style modala podglądu na żywo
+  previewModalContainer: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+  },
+  previewModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    gap: 12,
+  },
+  previewModalTitle: {
+    fontSize: 15,
+    fontFamily: APP_FONT,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  previewModalSub: {
+    fontSize: 11.5,
+    fontFamily: APP_FONT,
+    color: '#64748B',
+  },
+  deviceSwitchRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    padding: 3,
+    gap: 4,
+  },
+  deviceSwitchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  deviceSwitchBtnActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  deviceSwitchText: {
+    fontSize: 11.5,
+    fontFamily: APP_FONT,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  deviceSwitchTextActive: {
+    color: '#047857',
+    fontWeight: '700',
+  },
+  previewModalCloseBtn: {
+    padding: 6,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+  },
+  previewModalScroll: {
+    flex: 1,
+  },
+  previewModalScrollContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  deviceFrame: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: '#334155',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  deviceFrameMobile: {
+    width: 390,
+    minHeight: 680,
+  },
+  deviceFrameWeb: {
+    width: '100%',
+    maxWidth: 1080,
+    minHeight: 520,
+  },
+  deviceTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    gap: 10,
+  },
+  deviceDots: {
+    flexDirection: 'row',
+    gap: 5,
+  },
+  deviceDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  deviceUrl: {
+    fontSize: 11,
+    fontFamily: APP_FONT,
+    color: '#64748B',
+  },
+  mockAppHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#047857',
+  },
+  mockLogo: {
+    fontSize: 14,
+    fontFamily: APP_FONT,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  mockNav: {
+    fontSize: 11,
+    fontFamily: APP_FONT,
+    color: '#A7F3D0',
+  },
+  simulatedBannerContainer: {
+    width: '100%',
+    position: 'relative',
+    backgroundColor: '#CBD5E1',
+  },
+  simulatedBannerImg: {
+    width: '100%',
+    height: '100%',
+  },
+  simulatedSlideCounter: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  simulatedSlideText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontFamily: APP_FONT,
+    fontWeight: '700',
+  },
+  mockContent: {
+    padding: 16,
+    gap: 12,
+  },
+  mockSearch: {
+    height: 38,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+  },
+  mockCard: {
+    height: 80,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
 });

@@ -23,3 +23,21 @@ Stan bazowy audytu: commit `5acb5d3` (23–24 listopada 2026 r.), gałąź `mast
 | **HIPOTEZA-01** | Wydajność / Prawne | Kafelki OpenStreetMap podlegają Tile Usage Policy przy dużej skali | Zbadana: obecne użycie w granicach dopuszczalnych z prawidłowym copyright; przy >10k req/dzień zalecany dostawca CARTO/Stadia | Analiza w raporcie końcowym | `ZWERYFIKOWANA` | Brak |
 | **HIPOTEZA-02** | Prywatność | Geofencing / nieprecyzyjne współrzędne dla odbioru domowego vs wystawki | Zbadana: wdrożone rozróżnienie `isExact` (wystawka: dokładny punkt; oddam: orientacyjny obszar prywatności) | Weryfikacja wizualna i w typach | `ZWERYFIKOWANA / WDROŻONA` | Brak |
 | **HIPOTEZA-03** | Bezpieczeństwo | Wykrywanie numerów telefonów i adresów email w opisach | Funkcja `detectPiiInText` ostrzegająca autora przed publicznym ujawnianiem danych kontaktowych przed publikacją | Testy jednostkowe regexu (3 testy OK) | `ZWERYFIKOWANA / WDROŻONA` | Brak |
+
+---
+
+## Rejestr rozbudowy Panelu Administratora (ADM-01 do ADM-11)
+
+| ID | Priorytet | Obszar | Problem / Wymaganie | Rozwiązanie | Testy | Status |
+|---|---|---|---|---|---|---|
+| **ADM-01** | P1 | Wiarygodność danych | Sprzeczne etykiety demo/offline/live, dziedziczenie promienia użytkownika w adminie | Jasne wskaźniki źródła danych (Chmura/Lokalny/Demo), zakresu (Cały serwis), status odświeżenia i odrębne stany ładowania/zera/braku pomiaru | Weryfikacja w interfejsie i testy jednostkowe (22/22 testów OK) | `WDROŻONE` |
+| **ADM-02** | P1 | Moderacja | Brak kolejki spraw zgłoszeń, mieszanie głosów „zabrane” ze zgłoszeniami nadużyć | Osobna podzakładka Sprawy/Zgłoszenia grupująca zgłoszenia z historią, statusem i decyzją moderatora (`fetchModerationCasesInCloud`, `resolveModerationCaseInCloud`) | Testy RPC i weryfikacja interfejsu | `WDROŻONE` |
+| **ADM-03** | P1 | Cykl życia / Operacje | Błędne `+6h` dla typu Oddam, brak jednoznacznych statusów zakończenia | Dynamiczny TTL per typ (+6h wystawka / +14d oddam), rozdzielenie akceptacji od odnowienia, potwierdzenia akcji zbiorczych | Testy kalkulacji dat i operacji masowych | `WDROŻONE` |
+| **ADM-04** | P1 | Bezpieczeństwo / Audyt | Brak historii działań administratorów i rozdziału ról (moderator vs admin) | Tabela `admin_audit_log` z RLS, funkcje rejestrowania działań, dedykowana zakładka Audytu (`AdminAuditTab`) i weryfikacja uprawnień | Testy RLS, logowania operacji i uprawnień | `WDROŻONE` |
+| **ADM-05** | P2 | Bezpieczeństwo | Blokady oparte wyłącznie o nick bez powodu, zakresu i czasu | Tabela `admin_blocks` z powodem, zakresem (ogłoszenia/tablica/całość), czasem wygaśnięcia i cofaniem | Testy blokowania i wygasania | `WDROŻONE` |
+| **ADM-06** | P2 | Filtrowanie | Brak filtrów miejscowości, zakresu dat publikacji/wygaśnięcia i autora | Filtry miasta, daty (dziś/7d/30d) i autora z podsumowaniem aktywnych filtrów i przyciskiem wyczyszczenia | Testy filtrów | `WDROŻONE` |
+| **ADM-07** | P2 | Analityka | Brak przedziałów czasowych, definicji metryk i porównań okresów | Zakresy Dziś/7d/30d/Wszystkie, oddzielenie bieżącego stanu od zdarzeń w okresie, rzetelne definicje miar | Weryfikacja obliczeń metryk | `WDROŻONE` |
+| **ADM-08** | P2 | Metryki domenowe | Brak miar skuteczności Oddam i świeżości Wystawek | 14-dniowa kohorta oddanych (licznik/mianownik), mediana czasu, rozkład wieku wystawek i czas do zgłoszenia zabrania | Testy obliczeń kohortowych | `WDROŻONE` |
+| **ADM-09** | P2 | Monitoring | Brak monitoringu integracji i rejestru nieudanych prób publikacji/uploadu | Widok kondycji systemu w zakładce System, stan integracji, błędy techniczne vs walidacja, kolejka sync | Testy widoku kondycji | `WDROŻONE` |
+| **ADM-10** | P2 | Eko-metryki | Osobiste CO₂ użytkownika wyświetlane jako globalne statystyki serwisu | Rozdzielenie danych osobistych od globalnych, globalne CO₂ wg metodologii LCA/KOBiZE/WRAP z jawnym opisem | Testy estymacji CO2 | `WDROŻONE` |
+| **ADM-11** | P3 | Zarządzanie treścią | Brak harmonogramu, podglądu i wersji w edytorze banerów | Status szkic/opublikowany, harmonogram dat od-do, modal podglądu na żywo (Mobile 390px / Web 1240px) i przywracanie wersji (Rollback) | Testy harmonogramu banerów i widoków | `WDROŻONE` |

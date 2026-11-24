@@ -454,3 +454,57 @@ AS $$
   ORDER BY reports_count DESC, latest_report_date DESC;
 $$;
 
+-- ----------------------------------------------------
+-- DZIENNIK AUDYTU I BLOKADY ADMINISTRATORA (ADM-04, ADM-05)
+-- ----------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.admin_audit_log (
+  id TEXT PRIMARY KEY,
+  actor_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  actor_name TEXT NOT NULL,
+  actor_role TEXT NOT NULL CHECK (actor_role IN ('admin', 'moderator', 'system')),
+  action TEXT NOT NULL,
+  target_type TEXT NOT NULL CHECK (target_type IN ('item', 'board_post', 'user', 'banner', 'setting', 'report', 'bulk')),
+  target_id TEXT NOT NULL,
+  reason TEXT,
+  details JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS admin_audit_log_created_idx ON public.admin_audit_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS admin_audit_log_target_idx ON public.admin_audit_log (target_type, target_id);
+
+ALTER TABLE public.admin_audit_log ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.admin_blocks (
+  id TEXT PRIMARY KEY,
+  target_type TEXT NOT NULL CHECK (target_type IN ('user_id', 'author_name', 'fingerprint')),
+  target_value TEXT NOT NULL,
+  reason TEXT NOT NULL CHECK (char_length(trim(reason)) >= 3),
+  scope TEXT NOT NULL DEFAULT 'all' CHECK (scope IN ('all', 'items', 'board')),
+  expires_at TIMESTAMPTZ,
+  blocked_by_name TEXT NOT NULL,
+  blocked_by_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  revoked_at TIMESTAMPTZ,
+  revoked_by_name TEXT
+);
+
+CREATE INDEX IF NOT EXISTS admin_blocks_target_idx ON public.admin_blocks (target_type, target_value);
+ALTER TABLE public.admin_blocks ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.board_reports (
+  id TEXT PRIMARY KEY,
+  post_id TEXT NOT NULL REFERENCES public.board_posts(id) ON DELETE CASCADE,
+  reporter_key TEXT NOT NULL,
+  reason TEXT NOT NULL CHECK (char_length(trim(reason)) BETWEEN 2 AND 500),
+  details TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'dismissed', 'action_taken')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  reviewed_at TIMESTAMPTZ,
+  reviewed_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS board_reports_post_idx ON public.board_reports (post_id, created_at DESC);
+ALTER TABLE public.board_reports ENABLE ROW LEVEL SECURITY;
+
+

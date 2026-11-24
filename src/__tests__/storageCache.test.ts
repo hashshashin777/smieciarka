@@ -102,4 +102,63 @@ describe('StorageCache and neighborhood helpers', () => {
     const clamped = await StorageCache.getAdminSettings();
     expect(clamped.autoExpireOddamDays).toBe(14);
   });
+
+  it('records and retrieves admin audit log entries (ADM-04)', async () => {
+    const initialLog = await StorageCache.getAdminAuditLog();
+    expect(initialLog).toEqual([]);
+
+    await StorageCache.recordAdminAuditLog({
+      actorName: 'Admin Jan',
+      actorRole: 'admin',
+      action: 'delete_item',
+      targetType: 'item',
+      targetId: 'item-123',
+      reason: 'Spam / oferta komercyjna',
+    });
+
+    const logs = await StorageCache.getAdminAuditLog();
+    expect(logs).toHaveLength(1);
+    expect(logs[0].actorName).toBe('Admin Jan');
+    expect(logs[0].targetId).toBe('item-123');
+    expect(logs[0].reason).toBe('Spam / oferta komercyjna');
+  });
+
+  it('saves and retrieves admin blocks and moderation cases (ADM-02, ADM-05)', async () => {
+    expect(await StorageCache.getAdminBlocks()).toEqual([]);
+    expect(await StorageCache.getModerationCases()).toEqual([]);
+
+    await StorageCache.saveAdminBlocks([
+      {
+        id: 'block-1',
+        targetType: 'author_name',
+        targetValue: 'Spammer123',
+        reason: 'Wymóg opłaty za darmowe',
+        scope: 'all',
+        blockedByName: 'Moderator',
+        createdAt: '2026-11-24T06:00:00Z',
+      },
+    ]);
+
+    const blocks = await StorageCache.getAdminBlocks();
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].targetValue).toBe('Spammer123');
+
+    await StorageCache.saveModerationCases([
+      {
+        caseId: 'case-1',
+        targetType: 'item',
+        targetId: 'item-99',
+        reportsCount: 3,
+        latestReason: 'Już zabrane',
+        latestReportDate: '2026-11-24T06:00:00Z',
+        reasonsList: ['Już zabrane', 'Zły adres'],
+        caseStatus: 'pending',
+      },
+    ]);
+
+    const cases = await StorageCache.getModerationCases();
+    expect(cases).toHaveLength(1);
+    expect(cases[0].caseId).toBe('case-1');
+    expect(cases[0].reportsCount).toBe(3);
+  });
 });

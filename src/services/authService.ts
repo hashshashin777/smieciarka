@@ -125,6 +125,29 @@ export const AuthService = {
     }
   },
 
+  async getCurrentUserRole(): Promise<'admin' | 'moderator' | 'user'> {
+    if (!supabase) return 'user';
+    try {
+      const { data } = await supabase.auth.getUser();
+      const role = data.user?.app_metadata?.role;
+      if (role === 'admin' || role === 'moderator') return role;
+      return 'user';
+    } catch {
+      return 'user';
+    }
+  },
+
+  async isCurrentUserModeratorOrAdmin(): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { data } = await supabase.auth.getUser();
+      const role = data.user?.app_metadata?.role;
+      return role === 'admin' || role === 'moderator';
+    } catch {
+      return false;
+    }
+  },
+
   async hasLocalAdminPin(): Promise<boolean> {
     try {
       const hash = await getSecureItem(KEYS.ADMIN_PIN_HASH);

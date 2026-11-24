@@ -1,6 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
-import { BoardPost, PostItem, SyncAction } from '../types';
+import {
+  AdminAuditLogEntry,
+  AdminBlockEntry,
+  BoardPost,
+  ModerationCase,
+  PostItem,
+  SyncAction,
+} from '../types';
 import { CityOption } from '../constants/cities';
 import { ACCOUNTS_ENABLED } from '../constants/features';
 import { BannerSlotId, CustomBannerImages } from '../constants/banners';
@@ -23,6 +30,9 @@ const KEYS = {
   SELECTED_CITY: 'smieciarka_selected_city_v1',
   ADMIN_SETTINGS: 'smieciarka_admin_settings_v1',
   GUEST_ITEM_TOKENS: 'smieciarka_guest_item_tokens_v1',
+  ADMIN_AUDIT_LOG: 'smieciarka_admin_audit_log_v1',
+  ADMIN_BLOCKS: 'smieciarka_admin_blocks_v1',
+  MODERATION_CASES: 'smieciarka_moderation_cases_v1',
 };
 
 export interface AdminSettings {
@@ -598,6 +608,82 @@ export const StorageCache = {
       await AsyncStorage.removeItem(KEYS.ITEMS_CACHE);
     } catch {
       // Ignore clear error
+    }
+  },
+
+  async getAdminAuditLog(): Promise<AdminAuditLogEntry[]> {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.ADMIN_AUDIT_LOG);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  },
+
+  async recordAdminAuditLog(
+    entry: Omit<AdminAuditLogEntry, 'id' | 'createdAt'> & { id?: string; createdAt?: string }
+  ): Promise<AdminAuditLogEntry> {
+    const fullEntry: AdminAuditLogEntry = {
+      id: entry.id || `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      actorId: entry.actorId ?? null,
+      actorName: entry.actorName,
+      actorRole: entry.actorRole,
+      action: entry.action,
+      targetType: entry.targetType,
+      targetId: entry.targetId,
+      reason: entry.reason ?? null,
+      details: entry.details ?? null,
+      createdAt: entry.createdAt || new Date().toISOString(),
+    };
+
+    try {
+      const existing = await this.getAdminAuditLog();
+      const updated = [fullEntry, ...existing].slice(0, 500); // keep max 500 entries
+      await AsyncStorage.setItem(KEYS.ADMIN_AUDIT_LOG, JSON.stringify(updated));
+    } catch {
+      // Ignore write error
+    }
+
+    return fullEntry;
+  },
+
+  async getAdminBlocks(): Promise<AdminBlockEntry[]> {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.ADMIN_BLOCKS);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  },
+
+  async saveAdminBlocks(blocks: AdminBlockEntry[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(KEYS.ADMIN_BLOCKS, JSON.stringify(blocks));
+    } catch {
+      // Ignore write error
+    }
+  },
+
+  async getModerationCases(): Promise<ModerationCase[]> {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.MODERATION_CASES);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  },
+
+  async saveModerationCases(cases: ModerationCase[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(KEYS.MODERATION_CASES, JSON.stringify(cases));
+    } catch {
+      // Ignore write error
     }
   },
 
