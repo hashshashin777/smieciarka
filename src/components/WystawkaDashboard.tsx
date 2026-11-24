@@ -672,6 +672,47 @@ export const WystawkaDashboard: React.FC<WystawkaDashboardProps> = ({
           </View>
         )}
 
+        {/* MODUŁ EDUKACYJNY: Czym różni się Wystawka od Oddam za darmo? */}
+        <View style={[styles.explainerCard, isDark && styles.explainerCardDark]}>
+          {/* Wystawka uliczna */}
+          <View style={styles.explainerRow}>
+            <View style={styles.explainerIconWrapWystawka}>
+              <MaterialCommunityIcons name="dump-truck" size={19} color="#D97706" />
+            </View>
+            <View style={styles.explainerContent}>
+              <View style={styles.explainerHeaderRow}>
+                <Text style={styles.explainerTitleWystawka}>Wystawka uliczna</Text>
+                <View style={styles.wystawkaPill}>
+                  <Text style={styles.wystawkaPillText}>Na ulicy / wiacie</Text>
+                </View>
+              </View>
+              <Text style={[styles.explainerDesc, isDark && styles.textWhite]}>
+                Rzeczy w przestrzeni publicznej. <Text style={[styles.boldHighlight, isDark && styles.textWhite]}>Brak kontaktu i rezerwacji</Text> — podjeżdżasz i zabierasz prosto z chodnika (kto pierwszy, ten lepszy).
+              </Text>
+            </View>
+          </View>
+
+          <View style={[styles.explainerDividerHorizontal, isDark && styles.explainerDividerHorizontalDark]} />
+
+          {/* Oddam za darmo */}
+          <View style={styles.explainerRow}>
+            <View style={styles.explainerIconWrapOddam}>
+              <MaterialCommunityIcons name="gift-outline" size={19} color="#059669" />
+            </View>
+            <View style={styles.explainerContent}>
+              <View style={styles.explainerHeaderRow}>
+                <Text style={styles.explainerTitleOddam}>Oddam za darmo</Text>
+                <View style={styles.oddamPill}>
+                  <Text style={styles.oddamPillText}>Z rąk do rąk</Text>
+                </View>
+              </View>
+              <Text style={[styles.explainerDesc, isDark && styles.textWhite]}>
+                Przedmioty z domu sąsiada. <Text style={[styles.boldHighlight, isDark && styles.textWhite]}>Odbiór osobisty</Text> — piszesz na czacie i bezpiecznie umawiasz termin spotkania.
+              </Text>
+            </View>
+          </View>
+        </View>
+
         {/* 5. TWÓJ WPŁYW ZERO-WASTE */}
         <View style={tutorialStepIndex === 5 && styles.highlightedCard}>
           <EcoImpactCard stats={ecoStats} streakDays={streakDays} isDark={isDark} />
@@ -1315,6 +1356,115 @@ const styles = StyleSheet.create({
     color: '#E6FAF5',
     fontWeight: '600',
     marginTop: 2,
+  },
+
+  // Moduł edukacyjny: Czym różni się Wystawka od Oddam za darmo (Wersja mobilna)
+  explainerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 13,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  explainerCardDark: {
+    backgroundColor: '#142526',
+    borderColor: '#1E3A3A',
+  },
+  explainerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 11,
+  },
+  explainerIconWrapWystawka: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  explainerIconWrapOddam: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  explainerContent: {
+    flex: 1,
+  },
+  explainerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  explainerTitleWystawka: {
+    fontFamily: APP_FONT,
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  explainerTitleOddam: {
+    fontFamily: APP_FONT,
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#047857',
+  },
+  wystawkaPill: {
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  wystawkaPillText: {
+    fontFamily: APP_FONT,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#D97706',
+  },
+  oddamPill: {
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  oddamPillText: {
+    fontFamily: APP_FONT,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  explainerDesc: {
+    fontFamily: APP_FONT,
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 16.5,
+  },
+  explainerDividerHorizontal: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 10,
+  },
+  explainerDividerHorizontalDark: {
+    backgroundColor: '#1E3A3A',
+  },
+  boldHighlight: {
+    fontWeight: '700',
+    color: '#334155',
   },
 
   // 5. Section Header
