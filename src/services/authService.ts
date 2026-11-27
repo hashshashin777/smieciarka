@@ -10,6 +10,8 @@ import { ChatRepository } from './chatRepository';
 import { StorageCache } from './storageCache';
 import { supabase, isSupabaseConfigured } from './supabase';
 
+WebBrowser.maybeCompleteAuthSession();
+
 const KEYS = {
   USER_PROFILE: 'smieciarka_secure_profile_v2',
   GUEST_MODE: 'smieciarka_guest_mode_v1',
@@ -59,10 +61,7 @@ async function getSecureItem(key: string): Promise<string | null> {
 export const AuthService = {
   async getUserProfile(): Promise<UserProfile | null> {
     try {
-      const raw = await getSecureItem(KEYS.USER_PROFILE);
-      if (raw) {
-        return JSON.parse(raw) as UserProfile;
-      }
+
       if (supabase) {
         const { data } = await supabase.auth.getUser();
         const user = data.user;
@@ -188,33 +187,36 @@ export const AuthService = {
     }
   },
 
-  async signInWithGoogle(): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
+  async signInWithGoogle() { return AuthService.signInWithProvider('google'); },
+
+  async signInWithProvider(provider: 'google' | 'facebook' | 'apple'): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
     if (!isSupabaseConfigured || !supabase) {
       return {
         success: false,
         error:
-          'Logowanie Google wymaga skonfigurowanego połączenia z serwerem Supabase w pliku .env.',
+          'Logowanie społecznościowe wymaga skonfigurowanego połączenia z serwerem Supabase w pliku .env.',
       };
     }
 
     try {
-      const redirectTo = makeRedirectUri({
+      const redirectTo = Platform.OS === 'web' ? window.location.origin + '/' : makeRedirectUri({
         scheme: 'smieciarka',
         path: 'auth/callback',
       });
 
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider,
         options: {
           redirectTo,
-          skipBrowserRedirect: true,
+          skipBrowserRedirect: Platform.OS !== 'web',
         },
       });
 
       if (error || !data?.url) {
-        return { success: false, error: error?.message || 'Nie udało się zainicjować logowania Google.' };
+        return { success: false, error: error?.message || 'Nie udało się zainicjować logowania społecznościowe.' };
       }
 
+      if (Platform.OS === 'web') return { success: false };
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
       if (result.type === 'success' && result.url) {
@@ -248,13 +250,13 @@ export const AuthService = {
               (sessionUser.user_metadata?.full_name as string) ||
               (sessionUser.user_metadata?.name as string) ||
               sessionUser.email?.split('@')[0] ||
-              'Sąsiad Google',
+              'Sąsiad społecznościowe',
             email: sessionUser.email || '',
             avatarUrl:
               (sessionUser.user_metadata?.avatar_url as string) ||
               (sessionUser.user_metadata?.picture as string) ||
               undefined,
-            provider: 'google',
+            provider,
             role: sessionUser.app_metadata?.role === 'admin' ? 'admin' : 'user',
             createdAt: new Date().toISOString(),
           };
@@ -264,14 +266,14 @@ export const AuthService = {
         }
       }
 
-      return { success: false, error: 'Logowanie Google zostało przerwane.' };
+      return { success: false, error: 'Logowanie społecznościowe zostało przerwane.' };
     } catch (err) {
       return {
         success: false,
         error:
           err instanceof Error
             ? err.message
-            : 'Wystąpił błąd podczas logowania przez Google.',
+            : 'Wystąpił błąd podczas logowania przez społecznościowe.',
       };
     }
   },
@@ -398,7 +400,8 @@ export const AuthService = {
       // Continue clearing local session
     }
     try {
-      await SecureStore.deleteItemAsync(KEYS.USER_PROFILE);
+      await AsyncStorage.removeItem(KEYS.USER_PROFILE);
+      if (Platform.OS !== 'web') await SecureStore.deleteItemAsync(KEYS.USER_PROFILE);
       await AsyncStorage.removeItem(KEYS.GUEST_MODE);
     } catch {
       // Ignore cleanup errors
@@ -452,3 +455,4 @@ export const AuthService = {
     };
   },
 };
+

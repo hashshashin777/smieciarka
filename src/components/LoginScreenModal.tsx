@@ -11,6 +11,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { safeOpenUrl } from '../utils/helpers';
@@ -84,31 +85,24 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
   };
 
   const handleSocialLogin = async (provider: AuthProvider) => {
-    if (provider !== 'google') {
-      Alert.alert(
-        'Dostępne wkrótce',
-        `Logowanie przez ${provider.toUpperCase()} nie jest jeszcze włączone. Użyj konta Google lub e-maila.`
-      );
-      return;
-    }
-
+    if (provider !== 'google' && provider !== 'facebook' && provider !== 'apple') return;
     setIsLoading(true);
     try {
-      const res = await AuthService.signInWithGoogle();
+      const res = await AuthService.signInWithProvider(provider);
       setIsLoading(false);
       if (res.success && res.user) {
         if (onLoginSuccess) {
           onLoginSuccess(res.user);
         } else {
-          onLoginProvider('google', res.user.name, res.user.email);
+          onLoginProvider(provider, res.user.name, res.user.email);
         }
         onClose();
         Alert.alert(
-          'Witaj w Śmieciarce! 👋',
-          `Pomyślnie połączono przez konto Google (${res.user.name}).\nMożesz teraz pisać i odbierać wiadomości od sąsiadów!`
+          'Witaj w Wystawka zero-waste! 👋',
+          `Pomyślnie połączono przez konto społecznościowe (${res.user.name}).\nMożesz teraz pisać i odbierać wiadomości od sąsiadów!`
         );
       } else if (res.error) {
-        Alert.alert('Logowanie Google', res.error);
+        Alert.alert('Logowanie', res.error);
       }
     } catch {
       setIsLoading(false);
@@ -131,9 +125,9 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
         Alert.alert('Błędny e-mail', 'Podaj poprawny adres e-mail (np. jan@poczta.pl).');
         return;
       }
-      if (password.length < 6) {
+      if (password.length < 8) {
         setIsLoading(false);
-        Alert.alert('Za krótkie hasło', 'Hasło musi mieć co najmniej 6 znaków.');
+        Alert.alert('Za krótkie hasło', 'Hasło musi mieć co najmniej 8 znaków.');
         return;
       }
       if (password !== confirmPassword) {
@@ -242,9 +236,13 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
             {/* Logo i Nagłówek */}
             <View style={styles.brandSection}>
               <View style={styles.logoBadge}>
-                <Text style={styles.logoLetter}>Ś.</Text>
+                <Image
+                  source={require('../assets/icon.png')}
+                  style={styles.logoImage}
+                  resizeMode="cover"
+                />
               </View>
-              <Text style={styles.brandTitle}>Śmieciarka</Text>
+              <Text style={styles.brandTitle}>Wystawka zero-waste</Text>
               <Text style={styles.brandSlogan}>Daj rzeczom drugie życie.</Text>
               <Text style={styles.brandSub}>Konto służy do bezpiecznej wymiany wiadomości o wystawkach</Text>
             </View>
@@ -276,6 +274,12 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
                 <GoogleLogoIcon size={20} />
                 <Text style={styles.googleBtnText}>Kontynuuj z Google</Text>
               </TouchableOpacity>
+              {(['facebook', 'apple'] as const).map(provider => (
+                <TouchableOpacity key={provider} style={styles.googleBtn} onPress={() => handleSocialLogin(provider)} disabled={isLoading} accessibilityRole="button">
+                  <MaterialCommunityIcons name={provider} size={22} color="#111827" />
+                  <Text style={styles.googleBtnText}>{provider === 'apple' ? 'Kontynuuj z Apple' : 'Kontynuuj z Facebook'}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
             {/* Separator "LUB ZA POMOCĄ E-MAIL" */}
@@ -566,8 +570,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   logoBadge: {
-    width: 72,
-    height: 72,
+    width: 76,
+    height: 76,
     borderRadius: 22,
     backgroundColor: '#000000',
     alignItems: 'center',
@@ -580,12 +584,11 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
     marginBottom: 12,
+    overflow: 'hidden',
   },
-  logoLetter: {
-    fontFamily: APP_FONT,
-    fontSize: 40,
-    fontWeight: '900',
-    color: '#10B981',
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   brandTitle: {
     fontFamily: APP_FONT,
