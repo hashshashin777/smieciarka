@@ -7,11 +7,6 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "splash": {
-      "image": "./assets/welcome_splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#021E19"
-    },
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
@@ -93,7 +88,16 @@
           }
         }
       ],
-      "./plugins/withAndroidQueries"
+      "./plugins/withAndroidQueries",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/welcome_splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#021E19",
+          "imageWidth": 200
+        }
+      ]
     ],
     "web": {
       "favicon": "./assets/favicon.png",
