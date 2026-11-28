@@ -53,6 +53,12 @@ interface LoginScreenModalProps {
   onContinueAsGuest: () => void;
 }
 
+const socialProviders = (['facebook', 'apple'] as const).filter((provider) =>
+  provider === 'facebook'
+    ? process.env.EXPO_PUBLIC_FACEBOOK_AUTH_ENABLED === 'true'
+    : process.env.EXPO_PUBLIC_APPLE_AUTH_ENABLED === 'true'
+);
+
 type AuthTab = 'register' | 'login';
 
 export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
@@ -152,7 +158,7 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
           `Witaj, ${res.user.name}! Twoje konto e-mail zostało zarejestrowane. Możesz pisać do wystawiających i umawiać odbiory.`
         );
       } else {
-        Alert.alert('Błąd rejestracji', res.error || 'Nie udało się zarejestrować konta.');
+        Alert.alert(res.needsEmailVerification ? 'Potwierdź adres e-mail' : 'Błąd rejestracji', res.error || 'Nie udało się zarejestrować konta.');
       }
     } else {
       // Logowanie do istniejącego konta
@@ -260,9 +266,10 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
               </View>
             </View>
 
-            {/* Szybka rejestracja / logowanie społecznościowe */}
+            {(process.env.EXPO_PUBLIC_GOOGLE_AUTH_ENABLED === 'true' || socialProviders.length > 0) && (
+            <>
             <View style={styles.socialButtonsContainer}>
-              {/* Google */}
+              {process.env.EXPO_PUBLIC_GOOGLE_AUTH_ENABLED === 'true' && (
               <TouchableOpacity
                 style={styles.googleBtn}
                 onPress={() => handleSocialLogin('google')}
@@ -274,7 +281,8 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
                 <GoogleLogoIcon size={20} />
                 <Text style={styles.googleBtnText}>Kontynuuj z Google</Text>
               </TouchableOpacity>
-              {(['facebook', 'apple'] as const).map(provider => (
+               )}
+              {socialProviders.map(provider => (
                 <TouchableOpacity key={provider} style={styles.googleBtn} onPress={() => handleSocialLogin(provider)} disabled={isLoading} accessibilityRole="button">
                   <MaterialCommunityIcons name={provider} size={22} color="#111827" />
                   <Text style={styles.googleBtnText}>{provider === 'apple' ? 'Kontynuuj z Apple' : 'Kontynuuj z Facebook'}</Text>
@@ -288,6 +296,9 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
               <Text style={styles.dividerText}>LUB ADRESEM E-MAIL</Text>
               <View style={styles.dividerLine} />
             </View>
+
+            </>
+            )}
 
             {/* Formularz E-mail: Zakładki Rejestracja / Logowanie */}
             <View style={styles.emailCard}>
@@ -520,7 +531,11 @@ export const LoginScreenModal: React.FC<LoginScreenModalProps> = ({
                         text: 'Usuń dane',
                         style: 'destructive',
                         onPress: async () => {
-                          await AuthService.deleteAccountAndLocalData();
+                          const result = await AuthService.deleteAccountAndLocalData();
+                          if (!result.ok) {
+                            Alert.alert('Nie udało się wyczyścić danych', result.error);
+                            return;
+                          }
                           Alert.alert('Wyczyszczono', 'Lokalne dane konta zostały usunięte.');
                           onContinueAsGuest();
                         },

@@ -12,6 +12,11 @@ import { supabase, isSupabaseConfigured } from './supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
+function emailRedirect(path: '/auth/callback' | '/auth/reset') {
+  const origin = Platform.OS === 'web' ? window.location.origin : 'https://wystawka-app.vercel.app';
+  return new URL(path, origin).toString();
+}
+
 const KEYS = {
   USER_PROFILE: 'smieciarka_secure_profile_v2',
   GUEST_MODE: 'smieciarka_guest_mode_v1',
@@ -200,7 +205,7 @@ export const AuthService = {
 
     try {
       const redirectTo = Platform.OS === 'web' ? window.location.origin + '/' : makeRedirectUri({
-        scheme: 'smieciarka',
+        scheme: 'wystawka',
         path: 'auth/callback',
       });
 
@@ -305,7 +310,7 @@ export const AuthService = {
       password,
       options: {
         data: { full_name: cleanName },
-        emailRedirectTo: makeRedirectUri({ scheme: 'smieciarka', path: 'auth/callback' }),
+        emailRedirectTo: emailRedirect('/auth/callback'),
       },
     });
 
@@ -385,7 +390,7 @@ export const AuthService = {
       return { ok: false, error: 'Reset hasła wymaga połączenia z serwerem Supabase.' };
     }
     const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-      redirectTo: makeRedirectUri({ scheme: 'smieciarka', path: 'auth/reset' }),
+      redirectTo: emailRedirect('/auth/reset'),
     });
     if (error) return { ok: false, error: error.message };
     return { ok: true };

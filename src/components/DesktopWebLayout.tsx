@@ -62,9 +62,10 @@ interface DesktopWebLayoutProps {
   onTakeItem: (item: PostItem) => void;
   currentUser: UserProfile | null;
   onOpenAuth: () => void;
+  onOpenNotifications: () => void;
   onOpenAdmin: () => void;
   ecoStats: EcoStats;
-  usersCount: number;
+  usersCount: number | null;
   userCoords?: { latitude: number; longitude: number } | null;
   adminSettings: AdminSettings;
   streakDays?: number;
@@ -100,6 +101,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
   onTakeItem,
   currentUser,
   onOpenAuth,
+  onOpenNotifications,
   onOpenAdmin,
   ecoStats,
   usersCount,
@@ -331,7 +333,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
               >
                 <MaterialCommunityIcons
                   name="format-list-bulleted"
-                  size={20}
+                  size={24}
                   color={
                     activeTab === 'all' || activeTab === 'wystawka' || activeTab === 'oddam'
                       ? '#102B25'
@@ -359,7 +361,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
               >
                 <MaterialCommunityIcons
                   name="map-outline"
-                  size={20}
+                  size={24}
                   color={activeTab === 'map' ? '#102B25' : '#FFFFFF'}
                 />
                 <Text
@@ -382,7 +384,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
               >
                 <MaterialCommunityIcons
                   name="forum-outline"
-                  size={20}
+                  size={24}
                   color={activeTab === 'board' ? '#102B25' : '#FFFFFF'}
                 />
                 <Text
@@ -405,7 +407,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
               >
                 <MaterialCommunityIcons
                   name="chat-processing-outline"
-                  size={20}
+                  size={24}
                   color={activeTab === 'chat' ? '#102B25' : '#FFFFFF'}
                 />
                 <Text
@@ -427,41 +429,25 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 accessibilityLabel={`Zapisane ogłoszenia (${savedItemIds.length + savedBoardPostIds.length})`}
               >
                 <MaterialCommunityIcons
-                  name={savedItemIds.length > 0 ? 'heart' : 'heart-outline'}
-                  size={20}
+                  name={savedItemIds.length + savedBoardPostIds.length > 0 ? 'heart' : 'heart-outline'}
+                  size={24}
                   color={
-                    savedItemIds.length > 0
+                    savedItemIds.length + savedBoardPostIds.length > 0
                       ? '#EF4444'
                       : activeTab === 'saved'
                       ? '#102B25'
                       : '#FFFFFF'
                   }
                 />
-                <Text
-                  style={[
-                    styles.navLinkText,
-                    activeTab === 'saved' && styles.navLinkTextActive,
-                  ]}
-                >
-                  Zapisane ({savedItemIds.length + savedBoardPostIds.length})
-                </Text>
               </TouchableOpacity>
 
-              {/* Twoje konto (jeśli zalogowany) */}
-              {currentUser && (
-                <TouchableOpacity
-                  style={styles.navLink}
-                  onPress={onOpenAuth}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel="Profil użytkownika"
-                >
-                  <MaterialCommunityIcons name="account-circle-outline" size={22} color="#FFFFFF" />
-                  <Text style={styles.navLinkText}>
-                    {currentUser.name || 'Twoje konto'}
-                  </Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity style={styles.navLink} onPress={onOpenNotifications} accessibilityRole="button" accessibilityLabel="Powiadomienia">
+                <MaterialCommunityIcons name="bell-outline" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.navLink} onPress={onOpenAuth} accessibilityRole="button" accessibilityLabel="Twoje konto">
+                <MaterialCommunityIcons name="account-outline" size={24} color="#FFFFFF" />
+                <Text style={styles.navLinkText}>Twoje Konto</Text>
+              </TouchableOpacity>
 
               {/* Admin Pill (dla roli admin) */}
               {currentUser?.role === 'admin' && (
@@ -472,7 +458,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                   accessibilityRole="button"
                   accessibilityLabel="Panel Administratora"
                 >
-                  <MaterialCommunityIcons name="shield-crown-outline" size={18} color="#FBBF24" />
+                  <MaterialCommunityIcons name="shield-crown-outline" size={21.6} color="#FBBF24" />
                   <Text style={[styles.navLinkText, { color: '#FBBF24', fontWeight: '700' }]}>Admin</Text>
                 </TouchableOpacity>
               )}
@@ -487,7 +473,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
                 accessibilityRole="button"
                 accessibilityLabel="Dodaj nowe ogłoszenie"
               >
-                <MaterialCommunityIcons name="plus" size={20} color="#102B25" />
+                <MaterialCommunityIcons name="plus" size={24} color="#102B25" />
                 <Text style={styles.addCtaButtonText}>Dodaj ogłoszenie</Text>
               </Pressable>
             </View>
@@ -876,7 +862,7 @@ export const DesktopWebLayout: React.FC<DesktopWebLayoutProps> = ({
               <View style={styles.heroStatItem}>
                 <MaterialCommunityIcons name="account-group-outline" size={16} color="#059669" />
                 <Text style={styles.heroStatText}>
-                  <Text style={styles.heroStatBold}>{usersCount}</Text> sąsiadów online
+                  <Text style={styles.heroStatBold}>{usersCount?.toLocaleString('pl-PL') ?? '—'}</Text> zarejestrowanych kont
                 </Text>
               </View>
               <View style={styles.heroStatDot} />
@@ -1700,8 +1686,8 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
   webLogoImage: {
-    width: 108,
-    height: 72,
+    width: 97.2,
+    height: 64.8,
   },
   // Moduł czystego powietrza nad banerem w łagodnym stylu (heroAirBadge)
   // Połączony moduł czystego powietrza i serii aktywności (heroCombinedBadge)
@@ -1781,6 +1767,11 @@ const styles = StyleSheet.create({
     cursor: 'pointer' as any,
   },
   heroStreakDaysRow: {
+    backgroundColor: '#ECFDF5',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    padding: 6,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
@@ -1855,6 +1846,7 @@ const styles = StyleSheet.create({
     borderColor: '#BEF264',
   },
   navLinkText: {
+    fontFamily: 'Montserrat',
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
@@ -1889,6 +1881,7 @@ const styles = StyleSheet.create({
     borderColor: '#9ECC50',
   },
   addCtaButtonText: {
+    fontFamily: 'Montserrat',
     color: '#102B25',
     fontSize: 14,
     fontWeight: '700',

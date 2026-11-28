@@ -273,7 +273,7 @@ export const WystawkaDashboard: React.FC<WystawkaDashboardProps> = ({
                 <Text style={[styles.guestStatusTitle, isDark && styles.textWhite]}>
                   Tryb Gościa (bez konta)
                 </Text>
-                <Text style={styles.guestStatusSub}>Zaloguj przez Apple/Google, aby pisać wiadomości</Text>
+                <Text style={styles.guestStatusSub}>Zaloguj się, aby pisać wiadomości</Text>
               </View>
               {onRestartTutorial && (
                 <TouchableOpacity
@@ -826,15 +826,15 @@ export const WystawkaDashboard: React.FC<WystawkaDashboardProps> = ({
         )}
       </ScrollView>
 
-      {/* 7. OKRĄGŁY PŁYWAJĄCY PRZYCISK SPOŁECZNOŚCI (Rzeczywista liczba online) */}
+      {/* 7. Licznik zarejestrowanych kont */}
       {showOnlineBadge && (
         <TouchableOpacity
           style={styles.floatingCommunityBadge}
           activeOpacity={0.85}
           onPress={() =>
             Alert.alert(
-              'Społeczność na żywo 👥💚',
-              `W tej chwili ${usersCount} ${usersCount === 1 ? 'osoba jest teraz online w aplikacji' : usersCount < 5 ? 'osoby są teraz online w aplikacji' : 'osób jest teraz online w aplikacji'}.\n\nLicznik aktualizuje się automatycznie w czasie rzeczywistym!`,
+              'Zarejestrowane konta',
+              `Liczba zarejestrowanych kont: ${usersCount}.`,
               [{ text: 'Super!', style: 'default' }]
             )
           }

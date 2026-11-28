@@ -1,3 +1,6 @@
+import { useFonts } from 'expo-font';
+import { Montserrat_400Regular } from '@expo-google-fonts/montserrat';
+import { PasswordRecoveryModal } from './src/components/PasswordRecoveryModal';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
@@ -166,6 +169,7 @@ const SAMPLE_BOARD_IDS = new Set([
 ]);
 
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({ Montserrat: Montserrat_400Regular });
   const [items, setItems] = useState<PostItem[]>(INITIAL_ITEMS);
   const [boardPosts, setBoardPosts] = useState<BoardPost[]>(INITIAL_BOARD_POSTS);
   const [savedItemIds, setSavedItemIds] = useState<string[]>([]);
@@ -227,6 +231,9 @@ export default function App() {
 
   // Autoryzacja i konta (Apple, Google, Facebook) + Tryb Gość + Panel Admina
   const [adminSettings, setAdminSettings] = useState<AdminSettings>(DEFAULT_ADMIN_SETTINGS);
+  const [registeredCount, setRegisteredCount] = useState<number | null>(null);
+  const [accountVisible, setAccountVisible] = useState(false);
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [realOnlineCount, setRealOnlineCount] = useState<number>(1);
   const [isAdminModalVisible, setIsAdminModalVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -750,8 +757,23 @@ export default function App() {
     };
   }, [currentUser?.id]);
 
-  const effectiveUsersCount =
-    adminSettings.useRealOnlineUsers !== false ? realOnlineCount : adminSettings.usersCount;
+  useEffect(() => {
+    if (!supabase) return;
+    const client = supabase;
+    let active = true;
+    const refresh = async () => {
+      const { data, error } = await client.rpc('get_registered_account_count');
+      if (active && !error && typeof data === 'number') setRegisteredCount(data);
+    };
+    void refresh();
+    const timer = setInterval(() => void refresh(), 60_000);
+    return () => { active = false; clearInterval(timer); };
+  }, [currentUser?.id]);
+
+  const openAccount = () => {
+    if (currentUser) setAccountVisible(true);
+    else setIsLoginModalVisible(true);
+  };
 
   // Sprawdzanie czy ogłoszenie wygasło (TTL ustalane przez admina, domyślnie wystawka: 6 godzin, oddam: 14 dni)
   const autoExpireHours = adminSettings.autoExpireHours ?? 6;
@@ -1554,13 +1576,60 @@ export default function App() {
     })
   ).current;
 
+  if (!fontsLoaded && !fontError) return null;
+
   return (
     <SafeAreaProvider>
+      <PasswordRecoveryModal />
+      {[{ title: 'Twoje Konto', visible: accountVisible, close: () => setAccountVisible(false) },
+        { title: 'Powiadomienia', visible: notificationsVisible, close: () => setNotificationsVisible(false) }].map(({ title, visible, close }) => (
+        <Modal key={title} visible={visible} transparent animationType="fade" onRequestClose={close}>
+          <View style={styles.accountOverlay}>
+            <View style={styles.accountPanel}>
+              <Text style={styles.accountHeading} accessibilityRole="header">{title}</Text>
+              {title === 'Twoje Konto' ? (
+                <>
+                  <Text>{currentUser?.name}</Text>
+                  <Text>{currentUser?.email}</Text>
+                  <TouchableOpacity accessibilityRole="button" onPress={() => { close(); void handleSignOut(); }}>
+                    <Text>Wyloguj się</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <ScrollView style={{ maxHeight: 250 }}>
+                  {items.some(item => savedItemIds.includes(item.id) && !isItemActive(item)) ? (
+                    items.filter(item => savedItemIds.includes(item.id) && !isItemActive(item)).map(item => (
+                      <Text key={item.id} style={{ paddingVertical: 8 }}>Ogłoszenie „{item.title}” nie jest już aktywne.</Text>
+                    ))
+                  ) : <Text>Brak powiadomień.</Text>}
+                </ScrollView>
+              )}
+              <TouchableOpacity accessibilityRole="button" onPress={close}>
+                <Text style={{ color: '#047857', paddingVertical: 8 }}>Zamknij</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      ))}
       <View style={styles.rootContainer}>
         {!isDesktopWeb && <SpotlightBackground />}
         <SafeAreaView style={[styles.container, isDesktopWeb && { backgroundColor: '#F2F4F5' }]}>
           <StatusBar style="dark" />
 
+        {!isDesktopWeb && (
+          <View style={styles.mobileAccountNav}>
+            <TouchableOpacity style={styles.mobileAccountButton} onPress={openAccount} accessibilityRole="button">
+              <MaterialCommunityIcons name="account-outline" size={24} color="#047857" />
+              <Text style={styles.mobileAccountLabel}>Twoje Konto</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.mobileAccountButton} onPress={() => setViewMode('saved')} accessibilityRole="button" accessibilityLabel="Zapisane">
+              <MaterialCommunityIcons name="heart-outline" size={24} color="#047857" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.mobileAccountButton} onPress={() => setNotificationsVisible(true)} accessibilityRole="button" accessibilityLabel="Powiadomienia">
+              <MaterialCommunityIcons name="bell-outline" size={24} color="#047857" />
+            </TouchableOpacity>
+          </View>
+        )}
         {isDesktopWeb ? (
           <DesktopWebLayout
             items={items.filter((i) => isItemActive(i) && !isAuthorBlocked(i.authorName))}
@@ -1584,10 +1653,11 @@ export default function App() {
             onStillThere={(itemId) => handleVoteStillThere(itemId)}
             onTakeItem={(item) => handleVoteTaken(item.id)}
             currentUser={currentUser}
-            onOpenAuth={() => setIsLoginModalVisible(true)}
+            onOpenAuth={openAccount}
+            onOpenNotifications={() => setNotificationsVisible(true)}
             onOpenAdmin={() => setIsAdminModalVisible(true)}
             ecoStats={ecoStats}
-            usersCount={effectiveUsersCount}
+            usersCount={registeredCount}
             userCoords={userCoords}
             adminSettings={adminSettings}
             streakDays={streakDays}
@@ -1691,7 +1761,7 @@ export default function App() {
               wystawkaCount={wystawkaCount}
               oddamCount={oddamCount}
               recentItems={dashboardItems}
-              usersCount={effectiveUsersCount}
+              usersCount={registeredCount ?? 0}
               ecoStats={ecoStats}
               streakDays={streakDays}
               neighborhoodSettings={neighborhoodSettings}
@@ -1732,7 +1802,7 @@ export default function App() {
               adsEnabled={adminSettings.adsEnabled}
               customBanners={adminSettings.customBanners}
               bannerIntervalSeconds={3}
-              showOnlineBadge={adminSettings.useRealOnlineUsers !== false}
+              showOnlineBadge={registeredCount !== null}
               onOpenAdmin={() => setIsAdminModalVisible(true)}
               onOpenLogin={adminSettings.accountsEnabled ? () => setIsLoginModalVisible(true) : undefined}
               onSignOut={adminSettings.accountsEnabled ? handleSignOut : undefined}
@@ -1749,8 +1819,8 @@ export default function App() {
               selectedItem={selectedMapItem}
               onSelectItem={setSelectedMapItem}
               onOpenDetail={(item) => setDetailItem(item)}
-              usersCount={effectiveUsersCount}
-              showOnlineBadge={adminSettings.useRealOnlineUsers !== false}
+              usersCount={registeredCount ?? 0}
+              showOnlineBadge={registeredCount !== null}
               themeMode="light"
               isDark={false}
               selectedCity={selectedCity}
@@ -2266,6 +2336,12 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  mobileAccountNav: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 12, gap: 4, zIndex: 2 },
+  mobileAccountButton: { minWidth: 44, minHeight: 44, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, paddingHorizontal: 6 },
+  mobileAccountLabel: { fontFamily: APP_FONT, color: '#065F46', fontSize: 13 },
+  accountOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#0008' },
+  accountPanel: { backgroundColor: 'white', width: '100%', maxWidth: 420, padding: 24, borderRadius: 20, gap: 12 },
+  accountHeading: { fontFamily: APP_FONT, fontSize: 22, fontWeight: '700' },
   rootContainer: {
     flex: 1,
     backgroundColor: '#CBD5E1',

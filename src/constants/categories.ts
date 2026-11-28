@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import { CategoryMeta } from '../types';
 
 export const CATEGORIES: CategoryMeta[] = [
@@ -45,8 +44,4 @@ export const GRADIENTS = {
   statOrange: ['#F97316', '#C2410C'] as const,
 };
 
-export const APP_FONT = Platform.select({
-  ios: 'Avenir Next',
-  android: 'sans-serif',
-  default: 'System',
-});
+export const APP_FONT = 'Montserrat';

@@ -382,8 +382,8 @@ export const MapViewTab: React.FC<MapViewTabProps> = ({
           activeOpacity={0.85}
           onPress={() =>
             Alert.alert(
-              'Społeczność na żywo 👥💚',
-              `W tej chwili ${usersCount} ${usersCount === 1 ? 'osoba jest teraz online w Twojej okolicy' : usersCount < 5 ? 'osoby są teraz online w Twojej okolicy' : 'osób jest teraz online w Twojej okolicy'}!\n\nLicznik aktualizuje się automatycznie w czasie rzeczywistym.`,
+              'Zarejestrowane konta',
+              `Liczba zarejestrowanych kont: ${usersCount}.`,
               [{ text: 'Super!', style: 'default' }]
             )
           }

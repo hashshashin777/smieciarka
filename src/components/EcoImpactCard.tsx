@@ -395,6 +395,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   calendarDayCol: {
+    borderRadius: 12,
+    paddingVertical: 5,
+    backgroundColor: 'rgba(255,255,255,0.10)',
     flex: 1,
     alignItems: 'center',
   },
