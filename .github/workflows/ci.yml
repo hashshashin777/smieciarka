@@ -1,0 +1,54 @@
+name: Quality CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master, fix/001-ci-backup]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_SUPABASE_URL: ''
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        id: install
+        run: npm ci
+      - name: Lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run lint
+      - name: TypeScript
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run typecheck
+      - name: Jest
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm test -- --ci --runInBand
+      - name: Expo Doctor
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npx --yes expo-doctor
+      - name: Web build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npx expo export --platform web
