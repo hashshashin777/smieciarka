@@ -37,35 +37,18 @@ jobs:
       - name: Install dependencies
         id: install
         run: npm ci
-      - name: Prepare SDK 58 dependency candidate
-        id: candidate
-        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/001-ci-backup' }}
-        run: |
-          npm install --save-exact expo@58.1.0 expo-web-browser@58.1.0 expo-auth-session@58.0.20 expo-crypto@58.0.9 expo-location@58.0.23 expo-splash-screen@58.0.15
-          npm install --save-dev --save-exact jest-expo@58.0.16
-          npm ci
-          git diff --stat
-      - name: Save dependency candidate
-        if: ${{ steps.candidate.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: sdk58-dependency-candidate
-          path: |
-            package.json
-            package-lock.json
-          retention-days: 3
       - name: Lint
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.candidate.outcome != 'failure' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run lint
       - name: TypeScript
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.candidate.outcome != 'failure' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run typecheck
       - name: Jest
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.candidate.outcome != 'failure' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm test -- --ci --runInBand
       - name: Expo Doctor
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.candidate.outcome != 'failure' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npx --yes expo-doctor
       - name: Web build
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.candidate.outcome != 'failure' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npx expo export --platform web
