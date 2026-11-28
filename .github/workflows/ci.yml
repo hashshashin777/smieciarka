@@ -48,7 +48,9 @@ jobs:
         run: npm test -- --ci --runInBand
       - name: Expo Doctor
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: npx --yes expo-doctor
+        run: |
+          npx --yes expo-doctor@1.21.9 --version
+          npx --yes expo-doctor@1.21.9
       - name: Web build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npx expo export --platform web
